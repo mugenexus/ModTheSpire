@@ -19,6 +19,10 @@ ModTheSpire is a tool to load external mods for Slay the Spire without modifying
 
 Drag the divider beside **Description** to resize it. Select a mod and use **Add note…** to save a local note shared across profiles.
 
+The launcher opens in **Covers** view by default. Use the **Covers** button to switch views. Click a cover or press Space to toggle a mod, right-drag to reorder, and right-click or press F2 to choose or reset a local image. Alt+Up and Alt+Down also reorder the selected mod. Workshop covers are loaded from Steam when available.
+
+After pressing **Play**, use **Analyze error** to find the last reported exception and **Save log…** to export the captured launch log.
+
 Use **Merge profiles…** to add saved selections from one or more profiles to the current selection. Mods already selected keep their order and duplicates are skipped. Playing or switching profiles saves the resulting selection to the current profile.
 
 ---

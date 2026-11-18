@@ -284,6 +284,7 @@ public class Loader
             String id = null;
             String installPath = null;
             String timeUpdated = null;
+            String tags = null;
             String line = null;
             while ((line = reader.readLine()) != null) {
                 System.out.println(line);
@@ -297,8 +298,11 @@ public class Loader
                     installPath = line;
                 } else if (timeUpdated == null) {
                     timeUpdated = line;
+                } else if (tags == null) {
+                    tags = line;
                 } else {
-                    SteamSearch.WorkshopInfo info = new SteamSearch.WorkshopInfo(title, id, installPath, timeUpdated, line);
+                    SteamSearch.WorkshopInfo info = new SteamSearch.WorkshopInfo(title, id, installPath, timeUpdated, tags);
+                    info.previewUrl = line;
                     if (!info.hasTag("tool") && !info.hasTag("tools")) {
                         workshopInfos.add(info);
                     }
@@ -306,6 +310,7 @@ public class Loader
                     id = null;
                     installPath = null;
                     timeUpdated = null;
+                    tags = null;
                 }
             }
             if (steamDeck != null) {

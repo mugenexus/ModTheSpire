@@ -213,6 +213,7 @@ public class SteamSearch
         private final String installPath;
         private final int timeUpdated;
         private List<String> tags;
+        public String previewUrl;
 
         public WorkshopInfo(String title, String id, String installPath, String timeUpdated, String tagsString)
         {

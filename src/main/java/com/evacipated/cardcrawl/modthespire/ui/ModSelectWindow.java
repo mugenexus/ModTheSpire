@@ -85,6 +85,7 @@ public class ModSelectWindow extends JFrame
     public static Properties getDefaults()
     {
         Properties properties = new Properties();
+        properties.setProperty("cover-view", "true");
         properties.setProperty("x", "center");
         properties.setProperty("y", "center");
         properties.setProperty("width", Integer.toString(BASE_WIDTH));
@@ -258,7 +259,14 @@ public class ModSelectWindow extends JFrame
         JScrollPane modScroller = new JScrollPane(modList);
         modScroller.setBorder(BorderFactory.createLineBorder(ThemeManager.BORDER_DEFAULT));
         modScroller.getVerticalScrollBar().setUnitIncrement(ThemeManager.scale(16));
-        panel.add(modScroller, BorderLayout.CENTER);
+        ModCoverList covers = new ModCoverList(model, modList);
+        JScrollPane coverScroller = new JScrollPane(covers);
+        coverScroller.setBorder(modScroller.getBorder());
+        coverScroller.getVerticalScrollBar().setUnitIncrement(ThemeManager.scale(24));
+        JPanel views = new JPanel(new CardLayout());
+        views.add(modScroller, "list");
+        views.add(coverScroller, "covers");
+        panel.add(views, BorderLayout.CENTER);
 
         // Play button
         playBtn = new JButton(
@@ -283,6 +291,7 @@ public class ModSelectWindow extends JFrame
             textArea.setCaretColor(ThemeManager.TEXT_PRIMARY);
             JScrollPane logScroller = new JScrollPane(textArea);
             this.getContentPane().add(logScroller, BorderLayout.CENTER);
+            this.getContentPane().add(LaunchLog.actions(textArea), BorderLayout.SOUTH);
             MessageConsole mc = new MessageConsole(textArea);
             mc.redirectOut(null, System.out);
             mc.redirectErr(ThemeManager.STATUS_ERROR, System.err);
@@ -334,6 +343,7 @@ public class ModSelectWindow extends JFrame
         toggleAllBtn.setToolTipText("Toggle all mods On/Off");
         toggleAllBtn.addActionListener((ActionEvent event) -> {
             modList.toggleAllMods();
+            covers.repaint();
             repaint();
         });
 
@@ -440,6 +450,7 @@ public class ModSelectWindow extends JFrame
                 modPanel.filter(filterKeys);
             }
             modList.updateUI();
+            covers.refresh();
         };
         filter.getDocument().addDocumentListener(new DocumentListener() {
             @Override
@@ -461,7 +472,30 @@ public class ModSelectWindow extends JFrame
         JPanel topPanel = new JPanel(new BorderLayout(0, 6));
         topPanel.add(toolbar, BorderLayout.NORTH);
         topPanel.add(profilesPanel, BorderLayout.CENTER);
-        topPanel.add(filter, BorderLayout.SOUTH);
+        JPanel searchRow = new JPanel(new BorderLayout(ThemeManager.scale(6), 0));
+        searchRow.add(filter, BorderLayout.CENTER);
+        JToggleButton coverView = new JToggleButton("Covers", Loader.MTS_CONFIG.getBool("cover-view"));
+        coverView.setToolTipText("Switch between the mod list and cover grid");
+        Runnable switchView = () -> {
+            ((CardLayout) views.getLayout()).show(views, coverView.isSelected() ? "covers" : "list");
+            if (coverView.isSelected()) {
+                ModPanel selected = modList.getSelectedValue();
+                covers.refresh();
+                SwingUtilities.invokeLater(() -> covers.setSelectedValue(selected, true));
+            }
+        };
+        coverView.addActionListener(event -> {
+            switchView.run();
+            Loader.MTS_CONFIG.setBool("cover-view", coverView.isSelected());
+            try {
+                Loader.MTS_CONFIG.save();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
+        switchView.run();
+        searchRow.add(coverView, BorderLayout.EAST);
+        topPanel.add(searchRow, BorderLayout.SOUTH);
         panel.add(topPanel, BorderLayout.NORTH);
 
         // South panel with status and play button

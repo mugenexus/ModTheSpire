@@ -93,6 +93,8 @@ public class SteamWorkshop
                                 System.out.println(info.getFolder());
                                 System.out.println(details.getTimeUpdated());
                                 System.out.println(details.getTags());
+                                String preview = workshop.getQueryUGCPreviewURL(query, i);
+                                System.out.println(preview == null ? "" : preview);
                             }
                         }
                     } else {
