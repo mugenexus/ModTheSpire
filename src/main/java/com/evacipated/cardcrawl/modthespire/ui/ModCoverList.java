@@ -92,7 +92,29 @@ final class ModCoverList extends JList<ModPanel>
             return tile;
         });
         rows.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        rows.setCellRenderer(list.getCellRenderer());
+        JPanel row = new JPanel(new BorderLayout(ThemeManager.scale(6), 0));
+        row.setBorder(BorderFactory.createEmptyBorder(0, ThemeManager.scale(6), 0, ThemeManager.scale(8)));
+        JCheckBox checked = new JCheckBox();
+        checked.setOpaque(false);
+        checked.setBorder(BorderFactory.createEmptyBorder());
+        JLabel rowName = new JLabel();
+        rowName.putClientProperty("html.disable", true);
+        JLabel version = new JLabel();
+        version.setForeground(ThemeManager.TEXT_SECONDARY);
+        row.add(checked, BorderLayout.WEST);
+        row.add(rowName, BorderLayout.CENTER);
+        row.add(version, BorderLayout.EAST);
+        rows.setFixedCellHeight(Math.max(ThemeManager.scale(26), rowName.getPreferredSize().height + ThemeManager.scale(6)));
+        rows.setCellRenderer((section, mod, index, selected, focused) -> {
+            row.setBackground(selected ? ThemeManager.BG_SELECTED : index % 2 == 0
+                ? ThemeManager.BG_SECONDARY : ThemeManager.BG_PRIMARY);
+            checked.setSelected(mod.isSelected());
+            checked.setEnabled(mod.checkBox.isEnabled());
+            rowName.setForeground(mod.checkBox.isEnabled() ? ThemeManager.TEXT_PRIMARY : ThemeManager.STATUS_ERROR);
+            rowName.setText(mod.info.Name);
+            version.setText(mod.info.ModVersion == null ? "" : "v" + mod.info.ModVersion);
+            return row;
+        });
         rows.getAccessibleContext().setAccessibleName("无封面模组");
         rowScroll.setBorder(BorderFactory.createTitledBorder(
             BorderFactory.createLineBorder(ThemeManager.BORDER_DEFAULT), "无封面模组"));
@@ -228,7 +250,7 @@ final class ModCoverList extends JList<ModPanel>
             view.removeAll();
             if (!withoutCover.isEmpty()) {
                 int rowHeight = rows.getCellBounds(0, 0).height;
-                int height = rowHeight * Math.min(4, withoutCover.size()) + rowScroll.getInsets().top + rowScroll.getInsets().bottom;
+                int height = rowHeight * Math.min(6, withoutCover.size()) + rowScroll.getInsets().top + rowScroll.getInsets().bottom;
                 rowScroll.setPreferredSize(new Dimension(0, height));
                 view.add(rowScroll, visible.isEmpty() ? BorderLayout.CENTER : BorderLayout.NORTH);
             }

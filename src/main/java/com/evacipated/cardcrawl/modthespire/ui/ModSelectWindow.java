@@ -63,6 +63,7 @@ public class ModSelectWindow extends JFrame
     private JLabel mtsVersion;
     private JLabel stsVersion;
     private JTextArea description;
+    private JSplitPane detailsSplit;
     private JButton editNote;
     private String activeProfile;
     private File[] profileSelection;
@@ -86,6 +87,8 @@ public class ModSelectWindow extends JFrame
     {
         Properties properties = new Properties();
         properties.setProperty("cover-view", "true");
+        properties.setProperty("mods-divider", "280");
+        properties.setProperty("description-divider", "0");
         properties.setProperty("x", "center");
         properties.setProperty("y", "center");
         properties.setProperty("width", Integer.toString(BASE_WIDTH));
@@ -221,6 +224,16 @@ public class ModSelectWindow extends JFrame
         getContentPane().add(makeTopPanel(), BorderLayout.NORTH);
 
         pack();
+        if (!skipLauncher) {
+            addWindowListener(new WindowAdapter() {
+                @Override
+                public void windowOpened(WindowEvent event) {
+                    rememberDivider(splitPane, "mods-divider");
+                    validate();
+                    rememberDivider(detailsSplit, "description-divider");
+                }
+            });
+        }
         if (isCentered) {
             setLocationRelativeTo(null);
         } else {
@@ -235,6 +248,33 @@ public class ModSelectWindow extends JFrame
             rootPane.setDefaultButton(playBtn);
             EventQueue.invokeLater(playBtn::requestFocusInWindow);
         }
+    }
+
+    private void rememberDivider(JSplitPane split, String key)
+    {
+        int saved = Loader.MTS_CONFIG.getInt(key);
+        int minimum = split.getMinimumDividerLocation();
+        int maximum = split.getMaximumDividerLocation();
+        if (saved > 0 && maximum >= minimum) {
+            split.setDividerLocation(Math.max(minimum, Math.min(maximum, ThemeManager.scale(saved))));
+        }
+        split.addPropertyChangeListener(JSplitPane.DIVIDER_LOCATION_PROPERTY, event -> {
+            int position = split.getDividerLocation();
+            if (showingLog || !split.isShowing() || position < split.getMinimumDividerLocation()
+                || position > split.getMaximumDividerLocation()) {
+                return;
+            }
+            int logicalWidth = Math.round(position / ThemeManager.getScaleFactor());
+            if (logicalWidth == Loader.MTS_CONFIG.getInt(key)) {
+                return;
+            }
+            Loader.MTS_CONFIG.setInt(key, logicalWidth);
+            try {
+                Loader.MTS_CONFIG.save();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
     }
 
     private JPanel makeModListPanel()
@@ -601,6 +641,7 @@ public class ModSelectWindow extends JFrame
         details.setBorder(null);
         details.setMinimumSize(new Dimension(ThemeManager.scale(155), 0));
         JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, descriptionPanel, details);
+        detailsSplit = split;
         split.setContinuousLayout(true);
         split.setResizeWeight(0.85);
         split.setDividerLocation(Math.max(ThemeManager.scale(170), location.width - ThemeManager.scale(530)));
