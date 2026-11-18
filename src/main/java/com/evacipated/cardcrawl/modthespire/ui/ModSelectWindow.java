@@ -33,10 +33,10 @@ public class ModSelectWindow extends JFrame
     private static int getDefaultHeight() {
         return ThemeManager.scale(BASE_HEIGHT);
     }
-    private static final String DEBUG_OPTION = "Debug";
-    private static final String PLAY_OPTION = "Play";
-    private static final String JAR_DUMP_OPTION = "Dump Patched Jar";
-    private static final String PACKAGE_OPTION = "Package";
+    private static final String DEBUG_OPTION = "调试";
+    private static final String PLAY_OPTION = "启动游戏";
+    private static final String JAR_DUMP_OPTION = "导出补丁 JAR";
+    private static final String PACKAGE_OPTION = "打包";
 
     static final Image APP_ICON = Toolkit.getDefaultToolkit().createImage(ModSelectWindow.class.getResource("/assets/icon.png"));
     static final Icon ICON_UPDATE   = new ImageIcon(ModSelectWindow.class.getResource("/assets/update.gif"));
@@ -199,7 +199,7 @@ public class ModSelectWindow extends JFrame
 
     private void initUI(boolean skipLauncher)
     {
-        setTitle("ModTheSpire " + Loader.MTS_VERSION);
+        setTitle("杀戮尖塔 · 模组管理器  " + Loader.MTS_VERSION);
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         setResizable(true);
 
@@ -320,7 +320,7 @@ public class ModSelectWindow extends JFrame
 
         // Open mod directory
         JButton openFolderBtn = new JButton(UIManager.getIcon("FileView.directoryIcon"));
-        openFolderBtn.setToolTipText("Open Mods Directory");
+        openFolderBtn.setToolTipText("打开模组目录");
         openFolderBtn.addActionListener((ActionEvent event) -> {
             try {
                 File file = new File(Loader.MOD_DIR);
@@ -334,13 +334,13 @@ public class ModSelectWindow extends JFrame
         });
         // Check for Updates button
         JButton updatesBtn = new JButton(ICON_UPDATE);
-        updatesBtn.setToolTipText("Check for Mod Updates");
+        updatesBtn.setToolTipText("检查模组更新");
         updatesBtn.addActionListener(event -> {
             startCheckingForModUpdates(updatesBtn);
         });
         // Toggle all button
         JButton toggleAllBtn = new JButton(UIManager.getIcon("Tree.collapsedIcon"));
-        toggleAllBtn.setToolTipText("Toggle all mods On/Off");
+        toggleAllBtn.setToolTipText("启用或停用筛选结果");
         toggleAllBtn.addActionListener((ActionEvent event) -> {
             modList.toggleAllMods();
             covers.repaint();
@@ -349,6 +349,7 @@ public class ModSelectWindow extends JFrame
 
         JToolBar toolbar = new JToolBar();
         toolbar.setFloatable(false);
+        toolbar.setBackground(ThemeManager.BG_PRIMARY);
         toolbar.setBorder(null);
         toolbar.add(updatesBtn);
         toolbar.add(openFolderBtn);
@@ -360,9 +361,16 @@ public class ModSelectWindow extends JFrame
         JButton delProfile = new JButton("-");
 
         TextFieldWithPlaceholder filter = new TextFieldWithPlaceholder();
-        filter.setPlaceholder("Filter...");
+        filter.setPlaceholder("搜索模组");
 
         profilesList.setSelectedItem(activeProfile);
+        profilesList.setRenderer(new DefaultListCellRenderer() {
+            @Override public Component getListCellRendererComponent(JList<?> list, Object value, int index,
+                boolean selected, boolean focused) {
+                return super.getListCellRendererComponent(list,
+                    ModList.DEFAULT_LIST.equals(value) ? "默认配置" : value, index, selected, focused);
+            }
+        });
         delProfile.setEnabled(!ModList.DEFAULT_LIST.equals(activeProfile));
         profilesList.addActionListener(event -> {
             String profileName = (String) profilesList.getSelectedItem();
@@ -390,12 +398,12 @@ public class ModSelectWindow extends JFrame
         profilesPanel.add(profilesList, c);
         c.weightx = 0;
         // Add profile button
-        addProfile.setToolTipText("Add new profile");
+        addProfile.setToolTipText("新建配置组");
         addProfile.addActionListener((ActionEvent event) -> {
             String s = JOptionPane.showInputDialog(
                 this,
-                "Profile Name:",
-                "New Profile",
+                "配置组名称",
+                "新建配置组",
                 JOptionPane.PLAIN_MESSAGE
             );
             if (s != null && !s.trim().isEmpty() && !ModList.getAllModListNames().contains(s.trim())) {
@@ -406,14 +414,14 @@ public class ModSelectWindow extends JFrame
         });
         profilesPanel.add(addProfile, c);
         // Delete profile button
-        delProfile.setToolTipText("Delete profile");
+        delProfile.setToolTipText("删除配置组");
         delProfile.addActionListener((ActionEvent event) -> {
             String profileName = (String) profilesList.getSelectedItem();
 
             int n = JOptionPane.showConfirmDialog(
                 this,
-                "Are you sure?\nThis action cannot be undone.",
-                "Delete Profile \"" + profileName + "\"",
+                "确定删除此配置组？此操作无法撤销。",
+                "删除配置组 \"" + profileName + "\"",
                 JOptionPane.YES_NO_OPTION
             );
             if (n == 0) {
@@ -424,16 +432,16 @@ public class ModSelectWindow extends JFrame
         });
         profilesPanel.add(delProfile, c);
 
-        JButton mergeProfiles = new JButton("Merge profiles…");
-        mergeProfiles.setToolTipText("Add saved mods from other profiles to the current selection");
+        JButton mergeProfiles = new JButton("合并配置组");
+        mergeProfiles.setToolTipText("将其他配置组的模组加入当前勾选");
         mergeProfiles.addActionListener(event -> {
             JList<String> choices = new JList<>(ModList.getAllModListNames().stream()
                 .filter(profile -> !profile.equals(activeProfile)).sorted().toArray(String[]::new));
             if (choices.getModel().getSize() == 0) {
-                JOptionPane.showMessageDialog(this, "Create another profile first.");
+                JOptionPane.showMessageDialog(this, "请先创建另一个配置组。");
                 return;
             }
-            if (JOptionPane.showConfirmDialog(this, new JScrollPane(choices), "Merge into " + activeProfile,
+            if (JOptionPane.showConfirmDialog(this, new JScrollPane(choices), "合并到 " + activeProfile,
                 JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION && !choices.isSelectionEmpty()) {
                 filter.setText("");
                 ModList.loadCombined(modList.getCheckedMods(), choices.getSelectedValuesList(), model, info, modList);
@@ -474,14 +482,18 @@ public class ModSelectWindow extends JFrame
         topPanel.add(profilesPanel, BorderLayout.CENTER);
         JPanel searchRow = new JPanel(new BorderLayout(ThemeManager.scale(6), 0));
         searchRow.add(filter, BorderLayout.CENTER);
-        JToggleButton coverView = new JToggleButton("Covers", Loader.MTS_CONFIG.getBool("cover-view"));
-        coverView.setToolTipText("Switch between the mod list and cover grid");
+        JToggleButton coverView = new JToggleButton("封面视图", Loader.MTS_CONFIG.getBool("cover-view"));
+        coverView.setToolTipText("在封面和列表视图间切换");
         Runnable switchView = () -> {
             ((CardLayout) views.getLayout()).show(views, coverView.isSelected() ? "covers" : "list");
+            coverView.setText(coverView.isSelected() ? "切到列表" : "切到封面");
             if (coverView.isSelected()) {
                 ModPanel selected = modList.getSelectedValue();
                 covers.refresh();
-                SwingUtilities.invokeLater(() -> covers.setSelectedValue(selected, true));
+                SwingUtilities.invokeLater(() -> {
+                    ModPanel target = selected == null ? modList.getSelectedValue() : selected;
+                    covers.setSelectedValue(target, true);
+                });
             }
         };
         coverView.addActionListener(event -> {
@@ -519,7 +531,7 @@ public class ModSelectWindow extends JFrame
         JPanel infoPanel = new JPanel();
         name = BorderFactory.createTitledBorder(
             BorderFactory.createLineBorder(ThemeManager.BORDER_DEFAULT),
-            "Mod Info"
+            "模组详情"
         );
         name.setTitleFont(name.getTitleFont().deriveFont(Font.BOLD, (float) ThemeManager.scale(14)));
         name.setTitleColor(ThemeManager.TEXT_PRIMARY);
@@ -537,44 +549,46 @@ public class ModSelectWindow extends JFrame
         c.anchor = GridBagConstraints.WEST;
         c.weightx = 0.4;
 
-        authors = makeInfoTextAreaField("Author(s)", " ");
+        authors = makeInfoTextAreaField("作者", " ");
         infoPanel.add(authors, c);
 
         c.gridy = 1;
-        modVersion = makeInfoLabelField("ModVersion", " ");
+        modVersion = makeInfoLabelField("模组版本", " ");
         infoPanel.add(modVersion, c);
 
         c.gridy = 2;
-        mtsVersion = makeInfoLabelField("ModTheSpire Version", " ");
+        mtsVersion = makeInfoLabelField("加载器版本要求", " ");
         infoPanel.add(mtsVersion, c);
 
         c.gridy = 3;
-        stsVersion = makeInfoLabelField("Slay the Spire Version", " ");
+        stsVersion = makeInfoLabelField("适用游戏版本", " ");
         infoPanel.add(stsVersion, c);
 
         c.gridy = 4;
-        credits = makeInfoTextAreaField("Additional Credits", " ");
+        credits = makeInfoTextAreaField("致谢", " ");
         infoPanel.add(credits, c);
 
         c.gridy = 5;
-        c.weighty = 1;
-        status = makeInfoTextAreaField("Status", " ");
+        status = makeInfoTextAreaField("兼容性", " ");
         infoPanel.add(status, c);
+        c.gridy++;
+        c.weighty = 1;
+        infoPanel.add(Box.createVerticalGlue(), c);
 
-        description = makeInfoTextAreaField("Description", " ");
+        description = makeInfoTextAreaField("模组简介", " ");
         JScrollPane descScroller = new JScrollPane(description);
         descScroller.setBorder(description.getBorder());
         description.setBorder(null);
 
-        editNote = new JButton("Edit note…");
+        editNote = new JButton("编辑备注");
         editNote.setEnabled(false);
         editNote.addActionListener(event -> {
             ModInfo selected = currentModInfo;
             JTextArea note = new JTextArea(ModList.getNote(selected), 6, 32);
             note.setLineWrap(true);
             note.setWrapStyleWord(true);
-            note.getAccessibleContext().setAccessibleName("Mod note");
-            if (JOptionPane.showConfirmDialog(this, new JScrollPane(note), "Note — " + selected.Name,
+            note.getAccessibleContext().setAccessibleName("模组备注");
+            if (JOptionPane.showConfirmDialog(this, new JScrollPane(note), "备注 · " + selected.Name,
                 JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
                 ModList.setNote(selected, note.getText());
                 updateNoteButton();
@@ -588,13 +602,15 @@ public class ModSelectWindow extends JFrame
 
         JScrollPane details = new JScrollPane(infoPanel);
         details.setBorder(null);
-        details.setMinimumSize(new Dimension(ThemeManager.scale(140), 0));
+        details.setMinimumSize(new Dimension(ThemeManager.scale(155), 0));
         JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, descriptionPanel, details);
         split.setContinuousLayout(true);
-        split.setResizeWeight(0.6);
-        split.setDividerLocation(ThemeManager.scale(335));
+        split.setResizeWeight(0.85);
+        split.setDividerLocation(Math.max(ThemeManager.scale(170), location.width - ThemeManager.scale(530)));
         split.setBorder(null);
-        panel.setMinimumSize(new Dimension(ThemeManager.scale(280), 0));
+        panel.setMinimumSize(new Dimension(ThemeManager.scale(290), 0));
+        if (modList.getModel().getSize() > 0) modList.setSelectedIndex(0);
+        else description.setText("暂无模组。可从创意工坊订阅模组，或将模组放到本地模组目录。");
         panel.add(split, BorderLayout.CENTER);
 
         return panel;
@@ -605,7 +621,7 @@ public class ModSelectWindow extends JFrame
         JLabel label = new JLabel(value);
 
         TitledBorder border = BorderFactory.createTitledBorder(
-            BorderFactory.createLineBorder(ThemeManager.BORDER_DEFAULT),
+            BorderFactory.createEmptyBorder(),
             title
         );
         border.setTitleFont(border.getTitleFont().deriveFont(Font.BOLD, (float) ThemeManager.scale(12)));
@@ -614,7 +630,7 @@ public class ModSelectWindow extends JFrame
         label.setForeground(ThemeManager.TEXT_PRIMARY);
         label.setBorder(BorderFactory.createCompoundBorder(
             border,
-            BorderFactory.createEmptyBorder(ThemeManager.scale(6), ThemeManager.scale(8), ThemeManager.scale(6), ThemeManager.scale(8))
+            BorderFactory.createEmptyBorder(ThemeManager.scale(4), ThemeManager.scale(8), ThemeManager.scale(4), ThemeManager.scale(8))
         ));
 
         return label;
@@ -625,14 +641,14 @@ public class ModSelectWindow extends JFrame
         JTextArea label = new JTextArea(value);
 
         TitledBorder border = BorderFactory.createTitledBorder(
-            BorderFactory.createLineBorder(ThemeManager.BORDER_DEFAULT),
+            "模组简介".equals(title) ? BorderFactory.createLineBorder(ThemeManager.BORDER_DEFAULT) : BorderFactory.createEmptyBorder(),
             title
         );
         border.setTitleFont(border.getTitleFont().deriveFont(Font.BOLD, (float) ThemeManager.scale(12)));
         border.setTitleColor(ThemeManager.TEXT_SECONDARY);
         label.setBorder(BorderFactory.createCompoundBorder(
             border,
-            BorderFactory.createEmptyBorder(ThemeManager.scale(6), ThemeManager.scale(8), ThemeManager.scale(6), ThemeManager.scale(8))
+            BorderFactory.createEmptyBorder(ThemeManager.scale(4), ThemeManager.scale(8), ThemeManager.scale(4), ThemeManager.scale(8))
         ));
         label.setEditable(false);
         label.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -654,7 +670,7 @@ public class ModSelectWindow extends JFrame
         modUpdateBanner = new JLabel();
         modUpdateBanner.setIcon(ICON_WARNING);
         modUpdateBanner.setText("<html>" +
-            "An update is available for this mod." +
+            "此模组有可用更新。" +
             "</html>");
         modUpdateBanner.setHorizontalAlignment(JLabel.CENTER);
         modUpdateBanner.setOpaque(true);
@@ -668,21 +684,21 @@ public class ModSelectWindow extends JFrame
     private JPanel makeStatusPanel()
     {
         JPanel panel = new JPanel();
-        panel.setLayout(new BorderLayout(ThemeManager.scale(10), 0));
+        panel.setLayout(new BorderLayout(0, ThemeManager.scale(4)));
         panel.setBorder(BorderFactory.createCompoundBorder(
             new MatteBorder(1, 0, 0, 0, ThemeManager.BORDER_DEFAULT),
             BorderFactory.createEmptyBorder(ThemeManager.scale(6), 0, 0, 0)
         ));
 
         // StS version
-        JLabel sts_version = new JLabel("Slay the Spire: " + Loader.STS_VERSION);
+        JLabel sts_version = new JLabel("游戏版本  " + (Loader.STS_VERSION == null ? "未知" : Loader.STS_VERSION));
         sts_version.setForeground(ThemeManager.TEXT_SECONDARY);
         if (Loader.STS_BETA) {
-            sts_version.setText(sts_version.getText() + " BETA");
+            sts_version.setText(sts_version.getText() + " · 测试版");
             sts_version.setForeground(ThemeManager.STATUS_WARNING);
         }
-        sts_version.setHorizontalAlignment(SwingConstants.RIGHT);
-        panel.add(sts_version, BorderLayout.EAST);
+        sts_version.setBorder(new EmptyBorder(0, ThemeManager.scale(10), 0, 0));
+        panel.add(sts_version, BorderLayout.SOUTH);
 
         // Debug checkbox
         JCheckBox debugCheck = new JCheckBox(DEBUG_OPTION);
@@ -754,9 +770,9 @@ public class ModSelectWindow extends JFrame
             betaWarningBanner = new JLabel();
             betaWarningBanner.setIcon(ICON_ERROR);
             betaWarningBanner.setText("<html>" +
-                "You are on the Slay the Spire beta branch.<br/>" +
-                "If mods are not working correctly,<br/>" +
-                "switch to the main branch for best results." +
+                "当前运行的是《杀戮尖塔》测试版。<br/>" +
+                "如果模组无法正常运行，<br/>" +
+                "请切换到游戏的正式版本。" +
                 "</html>");
             betaWarningBanner.setHorizontalAlignment(JLabel.CENTER);
             betaWarningBanner.setOpaque(true);
@@ -771,8 +787,8 @@ public class ModSelectWindow extends JFrame
         mtsUpdateBanner = new JLabel();
         mtsUpdateBanner.setIcon(ICON_WARNING);
         mtsUpdateBanner.setText("<html>" +
-            "An update for ModTheSpire is available.<br/>" +
-            "Click here to open the download page." +
+            "ModTheSpire 有可用更新。<br/>" +
+            "点击打开下载页面。" +
             "</html>");
         mtsUpdateBanner.setHorizontalAlignment(JLabel.CENTER);
         mtsUpdateBanner.setOpaque(true);
@@ -869,16 +885,17 @@ public class ModSelectWindow extends JFrame
         currentModInfo = info;
 
         if (info == null) {
-            name.setTitle("Mod Info");
+            name.setTitle("模组详情");
             authors.setText("");
             modVersion.setText("");
             mtsVersion.setText("");
             stsVersion.setText("");
-            description.setText("");
+            description.setText("请选择一个模组查看简介。");
             credits.setText("");
+            credits.setVisible(false);
             status.setText("");
             editNote.setEnabled(false);
-            editNote.setText("Edit note…");
+            editNote.setText("编辑备注");
             modBannerNoticePanel.remove(modUpdateBanner);
             modBannerNoticePanel.revalidate();
             repaint();
@@ -889,24 +906,25 @@ public class ModSelectWindow extends JFrame
         if (info.ModVersion != null) {
             modVersion.setText(info.ModVersion.toString());
         } else {
-            modVersion.setText(" ");
+            modVersion.setText("—");
         }
         if (info.MTS_Version != null) {
             mtsVersion.setText(info.MTS_Version + "+");
         } else {
-            mtsVersion.setText(" ");
+            mtsVersion.setText("—");
         }
         if (info.STS_Version != null && !info.STS_Version.isEmpty()) {
             stsVersion.setText(info.STS_Version);
         } else {
-            stsVersion.setText(" ");
+            stsVersion.setText("—");
         }
-        description.setText(info.Description);
+        description.setText(info.Description == null || info.Description.trim().isEmpty() ? "此模组未提供简介。" : info.Description);
         description.setCaretPosition(0);
         updateNoteButton();
         credits.setText(info.Credits);
+        credits.setVisible(info.Credits != null && !info.Credits.trim().isEmpty());
 
-        status.setText(info.statusMsg);
+        status.setText(info.statusMsg == null || info.statusMsg.trim().isEmpty() ? "未发现兼容性问题" : info.statusMsg);
 
         setModUpdateBanner(info);
 
@@ -917,7 +935,7 @@ public class ModSelectWindow extends JFrame
     {
         String note = ModList.getNote(currentModInfo);
         editNote.setEnabled(true);
-        editNote.setText(note.isEmpty() ? "Add note…" : "View / edit note…");
+        editNote.setText(note.isEmpty() ? "添加备注" : "查看或编辑备注");
     }
 
     synchronized void setModUpdateBanner(ModInfo info)
@@ -1002,7 +1020,7 @@ public class ModSelectWindow extends JFrame
 
             if (anyNeedUpdates) {
                 updatesBtn.setIcon(ICON_WARNING);
-                updatesBtn.setToolTipText("Mod updates are available.");
+                updatesBtn.setToolTipText("有模组可更新。");
                 for (ActionListener listener : updatesBtn.getActionListeners()) {
                     updatesBtn.removeActionListener(listener);
                 }
@@ -1022,7 +1040,7 @@ public class ModSelectWindow extends JFrame
             if (modInfo.ModVersion == null) {
                 JOptionPane.showMessageDialog(null,
                     modInfo.Name + " has a missing or bad version number.\nGo yell at the author to fix it.",
-                    "Warning", JOptionPane.WARNING_MESSAGE);
+                    "警告", JOptionPane.WARNING_MESSAGE);
             }
         }
     }

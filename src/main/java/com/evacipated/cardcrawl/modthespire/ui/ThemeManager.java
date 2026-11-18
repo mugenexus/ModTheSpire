@@ -5,6 +5,7 @@ import com.formdev.flatlaf.FlatDarkLaf;
 import javax.swing.*;
 import javax.swing.plaf.FontUIResource;
 import java.awt.*;
+import java.util.Locale;
 
 /**
  * ModTheSpire 主题管理器
@@ -24,18 +25,18 @@ public final class ThemeManager {
     public static final Color STATUS_INFO = new Color(107, 193, 255);
 
     // 背景色
-    public static final Color BG_PRIMARY = new Color(43, 43, 43);
-    public static final Color BG_SECONDARY = new Color(60, 63, 65);
-    public static final Color BG_TERTIARY = new Color(69, 73, 74);
-    public static final Color BG_SELECTED = new Color(75, 110, 175);
+    public static final Color BG_PRIMARY = new Color(24, 24, 35);
+    public static final Color BG_SECONDARY = new Color(35, 34, 49);
+    public static final Color BG_TERTIARY = new Color(43, 41, 58);
+    public static final Color BG_SELECTED = new Color(62, 50, 93);
 
     // 文本色
-    public static final Color TEXT_PRIMARY = new Color(220, 220, 220);
-    public static final Color TEXT_SECONDARY = new Color(160, 160, 160);
+    public static final Color TEXT_PRIMARY = new Color(241, 238, 250);
+    public static final Color TEXT_SECONDARY = new Color(181, 175, 198);
     public static final Color TEXT_DISABLED = new Color(100, 100, 100);
 
     // 边框色
-    public static final Color BORDER_DEFAULT = new Color(80, 80, 80);
+    public static final Color BORDER_DEFAULT = new Color(66, 61, 87);
     public static final Color BORDER_FOCUS = ACCENT_COLOR;
 
     // 缩放设置键名
@@ -96,6 +97,7 @@ public final class ThemeManager {
      * 必须在创建任何 Swing 组件之前调用
      */
     public static void initialize() {
+        JComponent.setDefaultLocale(Locale.SIMPLIFIED_CHINESE);
         try {
             // 检测和设置缩放
             detectAndSetScaleFactor();
@@ -106,6 +108,19 @@ public final class ThemeManager {
 
                 // 设置全局字体
                 setGlobalFont();
+                UIManager.put("Panel.background", BG_PRIMARY);
+                UIManager.put("Viewport.background", BG_PRIMARY);
+                UIManager.put("ScrollPane.background", BG_PRIMARY);
+                UIManager.put("TextField.background", BG_SECONDARY);
+                UIManager.put("TextField.foreground", TEXT_PRIMARY);
+                UIManager.put("ComboBox.background", BG_SECONDARY);
+                UIManager.put("Button.background", BG_TERTIARY);
+                UIManager.put("Button.default.background", BG_SELECTED);
+                UIManager.put("Button.default.foreground", TEXT_PRIMARY);
+                UIManager.put("OptionPane.okButtonText", "确定");
+                UIManager.put("OptionPane.cancelButtonText", "取消");
+                UIManager.put("OptionPane.yesButtonText", "是");
+                UIManager.put("OptionPane.noButtonText", "否");
 
                 // 自定义 UI 属性
                 UIManager.put("Component.focusWidth", 1);

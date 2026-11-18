@@ -23,7 +23,7 @@ class UpdateWindow extends JDialog
     private void initUI()
     {
         if (ModSelectWindow.MODUPDATES.size() == 1) {
-            setTitle("Update Available");
+            setTitle("有可用更新");
         } else {
             setTitle(ModSelectWindow.MODUPDATES.size() + " Updates Available");
         }
@@ -49,9 +49,9 @@ class UpdateWindow extends JDialog
 
         String tmp;
         if (ModSelectWindow.MODUPDATES.size() == 1) {
-            tmp = "The following mod has an update available:";
+            tmp = "以下模组有可用更新";
         } else {
-            tmp = "The following mods have updates available:";
+            tmp = "以下模组有可用更新";
         }
         JLabel headerLabel = new JLabel(tmp);
         headerLabel.setIcon(ModSelectWindow.ICON_WARNING);
@@ -59,9 +59,9 @@ class UpdateWindow extends JDialog
         getContentPane().add(headerLabel, BorderLayout.NORTH);
 
         JPanel btnPanel = new JPanel(new GridLayout(2, 1, 0, 6));
-        JButton downloadBtn = new JButton("Download Updates and Restart ModTheSpire");
+        JButton downloadBtn = new JButton("下载更新并重启");
         downloadBtn.putClientProperty("JButton.buttonType", "default");
-        JButton browserBtn = new JButton("Open Releases in Browser");
+        JButton browserBtn = new JButton("在浏览器中打开发布页");
         btnPanel.add(downloadBtn);
         btnPanel.add(browserBtn);
         getContentPane().add(btnPanel, BorderLayout.SOUTH);

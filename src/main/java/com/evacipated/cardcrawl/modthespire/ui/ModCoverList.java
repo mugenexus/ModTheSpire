@@ -31,7 +31,7 @@ final class ModCoverList extends JList<ModPanel>
     private boolean refreshPending;
     private final Map<String, ImageIcon> thumbnails = new HashMap<>();
     private final ExecutorService downloads = Executors.newFixedThreadPool(3, task -> {
-        Thread thread = new Thread(task, "Mod cover");
+        Thread thread = new Thread(task, "模组封面");
         thread.setDaemon(true);
         return thread;
     });
@@ -44,30 +44,50 @@ final class ModCoverList extends JList<ModPanel>
         setVisibleRowCount(0);
         setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         setFixedCellWidth(ThemeManager.scale(122));
-        setFixedCellHeight(ThemeManager.scale(126));
-        getAccessibleContext().setAccessibleName("Mod covers");
+        setFixedCellHeight(ThemeManager.scale(138));
+        getAccessibleContext().setAccessibleName("模组封面");
 
-        JLabel tile = new JLabel();
-        tile.setOpaque(true);
-        tile.setHorizontalAlignment(SwingConstants.CENTER);
-        tile.setHorizontalTextPosition(SwingConstants.CENTER);
-        tile.setVerticalTextPosition(SwingConstants.BOTTOM);
-        tile.setIconTextGap(ThemeManager.scale(5));
+        setBackground(ThemeManager.BG_PRIMARY);
+        JPanel tile = new JPanel(new BorderLayout(0, ThemeManager.scale(4)));
+        tile.setOpaque(false);
+        JPanel card = new JPanel(new BorderLayout(0, ThemeManager.scale(5)));
+        tile.setBorder(BorderFactory.createEmptyBorder(ThemeManager.scale(3), ThemeManager.scale(3),
+            ThemeManager.scale(3), ThemeManager.scale(3)));
+        tile.add(card);
+        JLabel image = new JLabel("", SwingConstants.CENTER);
+        image.setPreferredSize(new Dimension(0, ThemeManager.scale(81)));
+        JPanel caption = new JPanel(new BorderLayout(ThemeManager.scale(3), 0));
+        caption.setOpaque(false);
+        JCheckBox enabled = new JCheckBox();
+        enabled.setOpaque(false);
+        enabled.setBorder(BorderFactory.createEmptyBorder());
+        JTextArea title = new JTextArea(2, 1);
+        title.setOpaque(false);
+        title.setLineWrap(true);
+        title.setWrapStyleWord(true);
+        title.setFont(getFont().deriveFont(Font.BOLD));
+        title.setMargin(new Insets(0, 0, 0, 0));
+        caption.add(enabled, BorderLayout.WEST);
+        caption.add(title, BorderLayout.CENTER);
+        card.add(image, BorderLayout.CENTER);
+        card.add(caption, BorderLayout.SOUTH);
         setCellRenderer((grid, mod, index, selected, focused) -> {
-            String name = mod.info.Name;
-            int maxWidth = getFixedCellWidth() - ThemeManager.scale(12);
-            FontMetrics metrics = tile.getFontMetrics(tile.getFont());
-            String label = name;
-            while (!label.isEmpty() && metrics.stringWidth(label + "\u2026") > maxWidth) {
-                label = label.substring(0, label.offsetByCodePoints(label.length(), -1));
-            }
-            tile.setText((mod.isSelected() ? "\u2611 " : "\u2610 ") + label + (label.equals(name) ? "" : "\u2026"));
-            tile.putClientProperty("html.disable", true);
-            tile.setForeground(selected ? ThemeManager.TEXT_PRIMARY : mod.checkBox.isEnabled()
-                ? ThemeManager.TEXT_SECONDARY : ThemeManager.STATUS_ERROR);
-            tile.setBackground(selected ? ThemeManager.BG_SELECTED : ThemeManager.BG_SECONDARY);
-            tile.setBorder(BorderFactory.createLineBorder(ThemeManager.BORDER_DEFAULT));
-            tile.setIcon(cover(mod));
+            Color border = selected ? ThemeManager.ACCENT_COLOR : ThemeManager.BORDER_DEFAULT;
+            int padding = ThemeManager.scale(5);
+            card.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(border, 1, true),
+                BorderFactory.createEmptyBorder(padding, padding, padding, padding)));
+            card.setBackground(selected ? ThemeManager.BG_SELECTED : ThemeManager.BG_SECONDARY);
+            enabled.setSelected(mod.isSelected());
+            enabled.setEnabled(mod.checkBox.isEnabled());
+            title.setText(mod.info.Name);
+            title.setForeground(mod.checkBox.isEnabled() ? ThemeManager.TEXT_PRIMARY : ThemeManager.STATUS_ERROR);
+            Icon icon = cover(mod);
+            image.setIcon(icon);
+            image.setText(icon == null ? initial(mod.info.Name) : "");
+            image.setFont(getFont().deriveFont(Font.BOLD, (float)ThemeManager.scale(30)));
+            image.setOpaque(icon == null);
+            image.setBackground(new Color(52, 45, 78));
+            image.setForeground(new Color(213, 201, 255));
             return tile;
         });
         setToolTipText("");
@@ -180,7 +200,7 @@ final class ModCoverList extends JList<ModPanel>
     @Override public String getToolTipText(MouseEvent event)
     {
         ModPanel mod = at(event.getPoint());
-        return mod == null ? null : "Mod: " + mod.info.Name + " — " + (mod.isSelected() ? "Enabled" : "Disabled");
+        return mod == null ? null : "模组：" + mod.info.Name + " — " + (mod.isSelected() ? "已启用" : "未启用");
     }
 
     private ModPanel at(Point point)
@@ -205,23 +225,23 @@ final class ModCoverList extends JList<ModPanel>
 
     private void chooseCover(ModPanel mod)
     {
-        Object[] options = {"Choose image…", "Reset cover", "Cancel"};
-        int action = JOptionPane.showOptionDialog(this, "Mod: " + mod.info.Name, "Mod cover", JOptionPane.DEFAULT_OPTION,
+        Object[] options = {"选择图片", "重置封面", "取消"};
+        int action = JOptionPane.showOptionDialog(this, "模组：" + mod.info.Name, "模组封面", JOptionPane.DEFAULT_OPTION,
             JOptionPane.PLAIN_MESSAGE, null, options, options[0]);
         String key = coverKey(mod);
         String previous = Loader.MTS_CONFIG.getString(key);
         if (action == 0) {
             JFileChooser chooser = new JFileChooser();
-            chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Images", "png", "jpg", "jpeg", "gif", "bmp"));
+            chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("图片", "png", "jpg", "jpeg", "gif", "bmp"));
             if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return;
             File file = chooser.getSelectedFile();
             try {
                 ImageIcon icon = thumbnail(file);
-                if (icon == null) throw new IOException("Unsupported image or image exceeds the size limit.");
+                if (icon == null) throw new IOException("图片格式不受支持，或文件超出大小限制。");
                 thumbnails.put("file:" + file.getAbsolutePath(), icon);
                 Loader.MTS_CONFIG.setString(key, file.getAbsolutePath());
             } catch (IOException e) {
-                JOptionPane.showMessageDialog(this, e.getMessage(), "Could not open cover", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(this, e.getMessage(), "无法打开封面", JOptionPane.ERROR_MESSAGE);
                 return;
             }
         } else if (action == 1) {
@@ -233,9 +253,15 @@ final class ModCoverList extends JList<ModPanel>
             Loader.MTS_CONFIG.save();
         } catch (IOException e) {
             Loader.MTS_CONFIG.setString(key, previous == null ? "" : previous);
-            JOptionPane.showMessageDialog(this, e.getMessage(), "Could not save cover", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, e.getMessage(), "无法保存封面", JOptionPane.ERROR_MESSAGE);
         }
         repaint();
+    }
+
+    private static String initial(String name)
+    {
+        String trimmed = name.trim();
+        return trimmed.isEmpty() ? "?" : trimmed.substring(0, trimmed.offsetByCodePoints(0, 1)).toUpperCase(Locale.ROOT);
     }
 
     private Icon cover(ModPanel mod)
@@ -253,7 +279,7 @@ final class ModCoverList extends JList<ModPanel>
                 }
             }
         }
-        if (source == null) return ModSelectWindow.ICON_WORKSHOP;
+        if (source == null) return null;
         if (!thumbnails.containsKey(source)) {
             String location = source;
             thumbnails.put(location, null);
@@ -272,8 +298,7 @@ final class ModCoverList extends JList<ModPanel>
                 });
             });
         }
-        ImageIcon icon = thumbnails.get(source);
-        return icon == null ? ModSelectWindow.ICON_WORKSHOP : icon;
+        return thumbnails.get(source);
     }
 
     private ImageIcon download(String location) throws IOException
@@ -319,7 +344,7 @@ final class ModCoverList extends JList<ModPanel>
                 params.setSourceSubsampling(step, step, 0, 0);
                 BufferedImage image = reader.read(0, params);
                 double scale = Math.min((double) ThemeManager.scale(108) / image.getWidth(),
-                    (double) ThemeManager.scale(88) / image.getHeight());
+                    (double) ThemeManager.scale(78) / image.getHeight());
                 return new ImageIcon(image.getScaledInstance(Math.max(1, (int)(image.getWidth() * scale)),
                     Math.max(1, (int)(image.getHeight() * scale)), Image.SCALE_SMOOTH));
             } finally {

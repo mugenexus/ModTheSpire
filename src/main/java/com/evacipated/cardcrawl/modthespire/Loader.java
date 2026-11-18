@@ -547,13 +547,13 @@ public class Loader
             }
         } catch (MissingDependencyException e) {
             System.err.println("ERROR: " + e.getMessage());
-            JOptionPane.showMessageDialog(null, e.getMessage(), "Missing Dependency", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(null, e.getMessage(), "缺少前置模组", JOptionPane.ERROR_MESSAGE);
         } catch (DuplicateModIDException e) {
             System.err.println("ERROR: " + e.getMessage());
-            JOptionPane.showMessageDialog(null, e.getMessage(), "Duplicate Mod ID", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(null, e.getMessage(), "模组 ID 重复", JOptionPane.ERROR_MESSAGE);
         } catch (MissingModIDException e) {
             System.err.println("ERROR: " + e.getMessage());
-            JOptionPane.showMessageDialog(null, e.getMessage(), "Missing Mod ID", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(null, e.getMessage(), "缺少模组 ID", JOptionPane.ERROR_MESSAGE);
         } catch (Exception e) {
             e.printStackTrace();
         }

@@ -26,11 +26,11 @@ public class TextFieldWithPlaceholder extends JTextField {
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
 
-        if (getText().isEmpty() && !isFocusOwner()) {
+        if (placeholder != null && getText().isEmpty() && !isFocusOwner() && !ThemeManager.isFlatLafInitialized()) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-            g2.setColor(ThemeManager.TEXT_DISABLED);
-            g2.setFont(getFont().deriveFont(Font.ITALIC));
+            g2.setColor(ThemeManager.TEXT_SECONDARY);
+            g2.setFont(getFont());
 
             // 计算垂直居中位置
             FontMetrics fm = g2.getFontMetrics();

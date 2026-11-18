@@ -15,27 +15,27 @@ final class LaunchLog
 
     static JPanel actions(JTextArea log)
     {
-        JButton analyze = new JButton("Analyze error");
+        JButton analyze = new JButton("分析错误");
         analyze.addActionListener(event -> {
             JTextArea summary = new JTextArea(summarize(log.getText()), 8, 52);
             summary.setEditable(false);
             summary.setLineWrap(true);
             summary.setWrapStyleWord(true);
-            JOptionPane.showMessageDialog(log, new JScrollPane(summary), "Launch log analysis",
+            JOptionPane.showMessageDialog(log, new JScrollPane(summary), "启动日志分析",
                 JOptionPane.INFORMATION_MESSAGE);
         });
-        JButton save = new JButton("Save log…");
+        JButton save = new JButton("保存日志");
         save.addActionListener(event -> {
             JFileChooser chooser = new JFileChooser();
             chooser.setSelectedFile(new File("ModTheSpire.log"));
             if (chooser.showSaveDialog(log) != JFileChooser.APPROVE_OPTION) return;
             File file = chooser.getSelectedFile();
-            if (file.exists() && JOptionPane.showConfirmDialog(log, "Overwrite " + file.getName() + "?",
-                "Save log", JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) return;
+            if (file.exists() && JOptionPane.showConfirmDialog(log, "是否覆盖 " + file.getName() + "?",
+                "保存日志", JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) return;
             try {
                 Files.write(file.toPath(), log.getText().getBytes(StandardCharsets.UTF_8));
             } catch (IOException e) {
-                JOptionPane.showMessageDialog(log, e.getMessage(), "Could not save log", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(log, e.getMessage(), "无法保存日志", JOptionPane.ERROR_MESSAGE);
             }
         });
         JPanel actions = new JPanel();
@@ -60,6 +60,6 @@ final class LaunchLog
         }
         if (rootCause != null) return rootCause;
         if (lastError != null) return lastError;
-        return "No exception or explicit error was found in the captured log.";
+        return "当前日志中未发现异常或明确的错误。";
     }
 }

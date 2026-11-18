@@ -116,14 +116,14 @@ public class ModPanel extends JPanel
             checkBox.setEnabled(false);
             setBackground(ERROR_BG);
             infoPanel.setWarningColors(ThemeManager.STATUS_ERROR);
-            info.statusMsg = "This mod is missing a valid ModTheSpire version number.";
+            info.statusMsg = "此模组缺少有效的 ModTheSpire 版本要求。";
             return;
         }
         if (info.MTS_Version.compareTo(Loader.MTS_VERSION) > 0) {
             checkBox.setEnabled(false);
             setBackground(ERROR_BG);
             infoPanel.setWarningColors(ThemeManager.STATUS_ERROR);
-            info.statusMsg = "This mod requires ModTheSpire v" + info.MTS_Version + " or higher.";
+            info.statusMsg = "此模组需要 ModTheSpire v" + info.MTS_Version + " 或更高版本。";
             return;
         }
 
@@ -132,16 +132,16 @@ public class ModPanel extends JPanel
             infoPanel.setWarningColors(ThemeManager.STATUS_WARNING);
             String[] missingDependencies = missingDependencies(info, parent);
             StringBuilder tooltip = new StringBuilder();
-            tooltip.append("Missing dependencies: [");
+            tooltip.append("缺少前置模组：[");
             tooltip.append(String.join(", ", missingDependencies));
             tooltip.append("]");
             info.statusMsg = tooltip.toString();
         }
         if (Loader.STS_VERSION != null && info.STS_Version != null && !Loader.STS_VERSION.equals(info.STS_Version)) {
             if (" ".equals(info.statusMsg)) {
-                info.statusMsg = "This mod explicitly supports StS " + info.STS_Version + ".\n" +
-                    "You are running StS " + Loader.STS_VERSION + ".\n" +
-                    "You may encounter problems running it.";
+                info.statusMsg = "此模组声明支持游戏版本 " + info.STS_Version + ".\n" +
+                    "当前游戏版本为 " + Loader.STS_VERSION + ".\n" +
+                    "运行时可能出现兼容性问题。";
             }
         }
     }
