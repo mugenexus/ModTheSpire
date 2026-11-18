@@ -260,12 +260,9 @@ public class ModSelectWindow extends JFrame
         modScroller.setBorder(BorderFactory.createLineBorder(ThemeManager.BORDER_DEFAULT));
         modScroller.getVerticalScrollBar().setUnitIncrement(ThemeManager.scale(16));
         ModCoverList covers = new ModCoverList(model, modList);
-        JScrollPane coverScroller = new JScrollPane(covers);
-        coverScroller.setBorder(modScroller.getBorder());
-        coverScroller.getVerticalScrollBar().setUnitIncrement(ThemeManager.scale(24));
         JPanel views = new JPanel(new CardLayout());
         views.add(modScroller, "list");
-        views.add(coverScroller, "covers");
+        views.add(covers.view(), "covers");
         panel.add(views, BorderLayout.CENTER);
 
         // Play button
@@ -343,7 +340,7 @@ public class ModSelectWindow extends JFrame
         toggleAllBtn.setToolTipText("启用或停用筛选结果");
         toggleAllBtn.addActionListener((ActionEvent event) -> {
             modList.toggleAllMods();
-            covers.repaint();
+            covers.view().repaint();
             repaint();
         });
 
@@ -492,7 +489,7 @@ public class ModSelectWindow extends JFrame
                 covers.refresh();
                 SwingUtilities.invokeLater(() -> {
                     ModPanel target = selected == null ? modList.getSelectedValue() : selected;
-                    covers.setSelectedValue(target, true);
+                    covers.selectMod(target);
                 });
             }
         };

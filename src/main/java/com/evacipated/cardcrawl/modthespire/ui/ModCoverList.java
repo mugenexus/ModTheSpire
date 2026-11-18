@@ -28,7 +28,13 @@ final class ModCoverList extends JList<ModPanel>
     private static final int MAX_IMAGE_BYTES = 8 * 1024 * 1024;
     private final DefaultListModel<ModPanel> source;
     private final DefaultListModel<ModPanel> visible = new DefaultListModel<>();
+    private final DefaultListModel<ModPanel> withoutCover = new DefaultListModel<>();
+    private final JList<ModPanel> rows = new JList<>(withoutCover);
+    private final JPanel view = new JPanel(new BorderLayout(0, ThemeManager.scale(6)));
+    private final JScrollPane rowScroll = new JScrollPane(rows);
+    private final JScrollPane gridScroll = new JScrollPane(this);
     private boolean refreshPending;
+    private boolean rebuilding;
     private final Map<String, ImageIcon> thumbnails = new HashMap<>();
     private final ExecutorService downloads = Executors.newFixedThreadPool(3, task -> {
         Thread thread = new Thread(task, "模组封面");
@@ -83,40 +89,65 @@ final class ModCoverList extends JList<ModPanel>
             title.setForeground(mod.checkBox.isEnabled() ? ThemeManager.TEXT_PRIMARY : ThemeManager.STATUS_ERROR);
             Icon icon = cover(mod);
             image.setIcon(icon);
-            image.setText(icon == null ? initial(mod.info.Name) : "");
-            image.setFont(getFont().deriveFont(Font.BOLD, (float)ThemeManager.scale(30)));
-            image.setOpaque(icon == null);
-            image.setBackground(new Color(52, 45, 78));
-            image.setForeground(new Color(213, 201, 255));
             return tile;
         });
-        setToolTipText("");
-        addListSelectionListener(event -> {
-            if (!event.getValueIsAdjusting() && isShowing()) {
-                list.setSelectedValue(getSelectedValue(), false);
+        rows.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        rows.setCellRenderer(list.getCellRenderer());
+        rows.getAccessibleContext().setAccessibleName("无封面模组");
+        rowScroll.setBorder(BorderFactory.createTitledBorder(
+            BorderFactory.createLineBorder(ThemeManager.BORDER_DEFAULT), "无封面模组"));
+        gridScroll.setBorder(BorderFactory.createLineBorder(ThemeManager.BORDER_DEFAULT));
+        gridScroll.getVerticalScrollBar().setUnitIncrement(ThemeManager.scale(24));
+        view.add(gridScroll, BorderLayout.CENTER);
+        attachInteractions(this, list);
+        attachInteractions(rows, list);
+        source.addListDataListener(new ListDataListener() {
+            @Override public void intervalAdded(ListDataEvent event) { refresh(); }
+            @Override public void intervalRemoved(ListDataEvent event) { refresh(); }
+            @Override public void contentsChanged(ListDataEvent event) { refresh(); }
+        });
+    }
+
+    JPanel view()
+    {
+        return view;
+    }
+
+    void selectMod(ModPanel mod)
+    {
+        setSelectedValue(mod, true);
+        rows.setSelectedValue(mod, true);
+    }
+
+    private void attachInteractions(JList<ModPanel> section, JModPanelCheckBoxList list)
+    {
+        section.addListSelectionListener(event -> {
+            if (!event.getValueIsAdjusting() && !rebuilding && section.isShowing() && section.getSelectedValue() != null) {
+                (section == rows ? this : rows).clearSelection();
+                list.setSelectedValue(section.getSelectedValue(), false);
             }
         });
-        getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_SPACE, 0), "toggle");
-        getActionMap().put("toggle", new AbstractAction() {
+        section.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_SPACE, 0), "toggle");
+        section.getActionMap().put("toggle", new AbstractAction() {
             @Override public void actionPerformed(ActionEvent e) {
-                toggle(getSelectedValue());
+                toggle(section.getSelectedValue());
             }
         });
-        getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_F2, 0), "cover");
-        getActionMap().put("cover", new AbstractAction() {
+        section.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_F2, 0), "cover");
+        section.getActionMap().put("cover", new AbstractAction() {
             @Override public void actionPerformed(ActionEvent e) {
-                if (getSelectedValue() != null) chooseCover(getSelectedValue());
+                if (section.getSelectedValue() != null) chooseCover(section.getSelectedValue());
             }
         });
         for (int direction : new int[]{-1, 1}) {
             String action = direction < 0 ? "moveEarlier" : "moveLater";
             int key = direction < 0 ? KeyEvent.VK_UP : KeyEvent.VK_DOWN;
-            getInputMap().put(KeyStroke.getKeyStroke(key, InputEvent.ALT_DOWN_MASK), action);
-            getActionMap().put(action, new AbstractAction() {
+            section.getInputMap().put(KeyStroke.getKeyStroke(key, InputEvent.ALT_DOWN_MASK), action);
+            section.getActionMap().put(action, new AbstractAction() {
                 @Override public void actionPerformed(ActionEvent e) {
-                    int target = getSelectedIndex() + direction;
-                    if (getSelectedValue() != null && target >= 0 && target < visible.size()) {
-                        move(getSelectedValue(), visible.get(target), list);
+                    int target = section.getSelectedIndex() + direction;
+                    if (section.getSelectedValue() != null && target >= 0 && target < section.getModel().getSize()) {
+                        move(section.getSelectedValue(), section.getModel().getElementAt(target), list);
                     }
                 }
             });
@@ -128,23 +159,23 @@ final class ModCoverList extends JList<ModPanel>
 
             @Override public void mousePressed(MouseEvent event) {
                 if (SwingUtilities.isRightMouseButton(event)) {
-                    dragged = at(event.getPoint());
+                    dragged = at(section, event.getPoint());
                     start = event.getPoint();
                     moved = false;
-                    if (dragged != null) setSelectedValue(dragged, false);
+                    if (dragged != null) section.setSelectedValue(dragged, false);
                 }
             }
 
             @Override public void mouseDragged(MouseEvent event) {
                 if (dragged != null && start.distance(event.getPoint()) >= java.awt.dnd.DragSource.getDragThreshold()) {
                     moved = true;
-                    scrollRectToVisible(new Rectangle(event.getPoint()));
+                    section.scrollRectToVisible(new Rectangle(event.getPoint()));
                 }
             }
 
             @Override public void mouseReleased(MouseEvent event) {
                 if (SwingUtilities.isRightMouseButton(event) && dragged != null) {
-                    ModPanel target = at(event.getPoint());
+                    ModPanel target = at(section, event.getPoint());
                     if (!moved) {
                         chooseCover(dragged);
                     } else if (target != null && target != dragged) {
@@ -155,16 +186,11 @@ final class ModCoverList extends JList<ModPanel>
             }
 
             @Override public void mouseClicked(MouseEvent event) {
-                if (SwingUtilities.isLeftMouseButton(event)) toggle(at(event.getPoint()));
+                if (SwingUtilities.isLeftMouseButton(event)) toggle(at(section, event.getPoint()));
             }
         };
-        addMouseListener(mouse);
-        addMouseMotionListener(mouse);
-        source.addListDataListener(new ListDataListener() {
-            @Override public void intervalAdded(ListDataEvent event) { refresh(); }
-            @Override public void intervalRemoved(ListDataEvent event) { refresh(); }
-            @Override public void contentsChanged(ListDataEvent event) { refresh(); }
-        });
+        section.addMouseListener(mouse);
+        section.addMouseMotionListener(mouse);
     }
 
     void refresh()
@@ -182,38 +208,56 @@ final class ModCoverList extends JList<ModPanel>
         int to = source.indexOf(target);
         source.removeElement(mod);
         source.add(to, mod);
-        SwingUtilities.invokeLater(() -> setSelectedValue(mod, true));
+        SwingUtilities.invokeLater(() -> selectMod(mod));
         list.publishBoxChecked();
     }
 
     private void rebuild()
     {
-        ModPanel selection = getSelectedValue();
-        visible.clear();
-        for (int i = 0; i < source.getSize(); i++) {
-            ModPanel mod = source.get(i);
-            if (!mod.isFilteredOut()) visible.addElement(mod);
+        ModPanel selection = getSelectedValue() == null ? rows.getSelectedValue() : getSelectedValue();
+        rebuilding = true;
+        try {
+            visible.clear();
+            withoutCover.clear();
+            for (int i = 0; i < source.getSize(); i++) {
+                ModPanel mod = source.get(i);
+                if (!mod.isFilteredOut()) {
+                    (cover(mod) == null ? withoutCover : visible).addElement(mod);
+                }
+            }
+            view.removeAll();
+            if (!withoutCover.isEmpty()) {
+                int rowHeight = rows.getCellBounds(0, 0).height;
+                int height = rowHeight * Math.min(4, withoutCover.size()) + rowScroll.getInsets().top + rowScroll.getInsets().bottom;
+                rowScroll.setPreferredSize(new Dimension(0, height));
+                view.add(rowScroll, visible.isEmpty() ? BorderLayout.CENTER : BorderLayout.NORTH);
+            }
+            if (!visible.isEmpty() || withoutCover.isEmpty()) view.add(gridScroll, BorderLayout.CENTER);
+            selectMod(selection);
+        } finally {
+            rebuilding = false;
         }
-        setSelectedValue(selection, false);
+        view.revalidate();
+        view.repaint();
     }
 
     @Override public String getToolTipText(MouseEvent event)
     {
-        ModPanel mod = at(event.getPoint());
+        ModPanel mod = at(this, event.getPoint());
         return mod == null ? null : "模组：" + mod.info.Name + " — " + (mod.isSelected() ? "已启用" : "未启用");
     }
 
-    private ModPanel at(Point point)
+    private static ModPanel at(JList<ModPanel> section, Point point)
     {
-        int index = locationToIndex(point);
-        return index >= 0 && getCellBounds(index, index).contains(point) ? visible.get(index) : null;
+        int index = section.locationToIndex(point);
+        return index >= 0 && section.getCellBounds(index, index).contains(point) ? section.getModel().getElementAt(index) : null;
     }
 
     private void toggle(ModPanel mod)
     {
         if (mod != null) {
             mod.setSelected(!mod.isSelected());
-            repaint();
+            view.repaint();
         }
     }
 
@@ -255,13 +299,7 @@ final class ModCoverList extends JList<ModPanel>
             Loader.MTS_CONFIG.setString(key, previous == null ? "" : previous);
             JOptionPane.showMessageDialog(this, e.getMessage(), "无法保存封面", JOptionPane.ERROR_MESSAGE);
         }
-        repaint();
-    }
-
-    private static String initial(String name)
-    {
-        String trimmed = name.trim();
-        return trimmed.isEmpty() ? "?" : trimmed.substring(0, trimmed.offsetByCodePoints(0, 1)).toUpperCase(Locale.ROOT);
+        refresh();
     }
 
     private Icon cover(ModPanel mod)
@@ -294,7 +332,7 @@ final class ModCoverList extends JList<ModPanel>
                 ImageIcon result = image;
                 SwingUtilities.invokeLater(() -> {
                     if (thumbnails.get(location) == null) thumbnails.put(location, result);
-                    repaint();
+                    if (result != null) refresh();
                 });
             });
         }
