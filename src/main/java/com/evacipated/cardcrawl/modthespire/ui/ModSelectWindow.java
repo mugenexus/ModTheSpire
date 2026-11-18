@@ -63,6 +63,9 @@ public class ModSelectWindow extends JFrame
     private JLabel mtsVersion;
     private JLabel stsVersion;
     private JTextArea description;
+    private JButton editNote;
+    private String activeProfile;
+    private File[] profileSelection;
     private JTextArea credits;
 
     private JPanel bannerNoticePanel;
@@ -208,7 +211,7 @@ public class ModSelectWindow extends JFrame
         JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
         splitPane.setLeftComponent(makeModListPanel());
         splitPane.setRightComponent(makeInfoPanel());
-        splitPane.setDividerLocation(280);
+        splitPane.setDividerLocation(ThemeManager.scale(280));
         splitPane.setDividerSize(6);
         splitPane.setContinuousLayout(true);
         splitPane.setBorder(null);
@@ -244,7 +247,12 @@ public class ModSelectWindow extends JFrame
         DefaultListModel<ModPanel> model = new DefaultListModel<>();
         modList = new JModPanelCheckBoxList(this, model);
         ModList mods = ModList.loadModLists();
+        if (Loader.profileArg != null && ModList.getAllModListNames().contains(Loader.profileArg)) {
+            mods = new ModList(Loader.profileArg);
+        }
+        activeProfile = mods.getName();
         mods.loadModsInOrder(model, info, modList);
+        profileSelection = modList.getCheckedMods();
         modList.publishBoxChecked();
 
         JScrollPane modScroller = new JScrollPane(modList);
@@ -285,21 +293,11 @@ public class ModSelectWindow extends JFrame
                 setLocationRelativeTo(null);
             }
 
-            Thread tCfg = new Thread(() -> {
-                // Save new load order cfg
-                ModList.save(ModList.getDefaultList(), modList.getCheckedMods());
-            });
-            tCfg.start();
+            File[] checkedMods = modList.getCheckedMods();
+            ModList.save(activeProfile, checkedMods);
+            File[] selectedMods = Loader.manualModIds != null ? modList.getAllMods() : checkedMods;
 
             Thread t = new Thread(() -> {
-                // Build array of selected mods
-                File[] selectedMods;
-                if (Loader.manualModIds != null) {
-                    selectedMods = modList.getAllMods();
-                } else {
-                    selectedMods = modList.getCheckedMods();
-                }
-
                 Loader.runMods(selectedMods);
                 if (Loader.CLOSE_WHEN_FINISHED) {
                     Loader.closeWindow();
@@ -354,29 +352,30 @@ public class ModSelectWindow extends JFrame
         TextFieldWithPlaceholder filter = new TextFieldWithPlaceholder();
         filter.setPlaceholder("Filter...");
 
-        profilesList.addActionListener((ActionEvent event) -> {
+        profilesList.setSelectedItem(activeProfile);
+        delProfile.setEnabled(!ModList.DEFAULT_LIST.equals(activeProfile));
+        profilesList.addActionListener(event -> {
             String profileName = (String) profilesList.getSelectedItem();
-            delProfile.setEnabled(!ModList.DEFAULT_LIST.equals(profileName));
-            ModList newList = new ModList(profileName);
-            DefaultListModel<ModPanel> newModel = (DefaultListModel<ModPanel>) modList.getModel();
-            newList.loadModsInOrder(newModel, info, modList);
+            if (profileName == null || profileName.equals(activeProfile)) {
+                return;
+            }
+            File[] checkedMods = modList.getCheckedMods();
+            if (!Arrays.equals(profileSelection, checkedMods)) {
+                ModList.save(activeProfile, checkedMods);
+            }
+            activeProfile = profileName;
+            delProfile.setEnabled(!ModList.DEFAULT_LIST.equals(activeProfile));
             filter.setText("");
-
-            Thread tCfg = new Thread(() -> {
-                // Save new load order cfg
-                ModList.save(profileName, modList.getCheckedMods());
-            });
-            tCfg.start();
+            new ModList(activeProfile).loadModsInOrder(model, info, modList);
+            profileSelection = modList.getCheckedMods();
+            ModList.select(activeProfile);
+            modList.publishBoxChecked();
         });
-        if (Loader.profileArg != null) {
-            profilesList.setSelectedItem(Loader.profileArg);
-        } else {
-            profilesList.setSelectedItem(ModList.getDefaultList());
-        }
 
         JPanel profilesPanel = new JPanel(new GridBagLayout());
         GridBagConstraints c = new GridBagConstraints();
         c.fill = GridBagConstraints.BOTH;
+        c.gridy = 0;
         c.weightx = 0.9;
         profilesPanel.add(profilesList, c);
         c.weightx = 0;
@@ -389,7 +388,8 @@ public class ModSelectWindow extends JFrame
                 "New Profile",
                 JOptionPane.PLAIN_MESSAGE
             );
-            if (s != null && !s.isEmpty()) {
+            if (s != null && !s.trim().isEmpty() && !ModList.getAllModListNames().contains(s.trim())) {
+                s = s.trim();
                 profilesList.addItem(s);
                 profilesList.setSelectedIndex(profilesList.getItemCount() - 1);
             }
@@ -407,12 +407,30 @@ public class ModSelectWindow extends JFrame
                 JOptionPane.YES_NO_OPTION
             );
             if (n == 0) {
-                profilesList.removeItem(profileName);
                 profilesList.setSelectedItem(ModList.DEFAULT_LIST);
+                profilesList.removeItem(profileName);
                 ModList.delete(profileName);
             }
         });
         profilesPanel.add(delProfile, c);
+
+        JButton mergeProfiles = new JButton("Merge profiles…");
+        mergeProfiles.setToolTipText("Add saved mods from other profiles to the current selection");
+        mergeProfiles.addActionListener(event -> {
+            JList<String> choices = new JList<>(ModList.getAllModListNames().stream()
+                .filter(profile -> !profile.equals(activeProfile)).sorted().toArray(String[]::new));
+            if (choices.getModel().getSize() == 0) {
+                JOptionPane.showMessageDialog(this, "Create another profile first.");
+                return;
+            }
+            if (JOptionPane.showConfirmDialog(this, new JScrollPane(choices), "Merge into " + activeProfile,
+                JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION && !choices.isSelectionEmpty()) {
+                filter.setText("");
+                ModList.loadCombined(modList.getCheckedMods(), choices.getSelectedValuesList(), model, info, modList);
+                modList.publishBoxChecked();
+            }
+        });
+        toolbar.add(mergeProfiles);
 
         Runnable filterModList = () -> {
             String filterText = filter.getText().trim().toLowerCase();
@@ -509,20 +527,41 @@ public class ModSelectWindow extends JFrame
         status = makeInfoTextAreaField("Status", " ");
         infoPanel.add(status, c);
 
-        c.gridx = 0;
-        c.gridy = 0;
-        c.gridheight = 6;
-        c.weightx = 0.6;
-        c.weighty = 1;
-        c.insets = new Insets(ThemeManager.scale(4), 0, ThemeManager.scale(4), ThemeManager.scale(12));
         description = makeInfoTextAreaField("Description", " ");
         JScrollPane descScroller = new JScrollPane(description);
         descScroller.setBorder(description.getBorder());
-        descScroller.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
         description.setBorder(null);
-        infoPanel.add(descScroller, c);
 
-        panel.add(infoPanel, BorderLayout.CENTER);
+        editNote = new JButton("Edit note…");
+        editNote.setEnabled(false);
+        editNote.addActionListener(event -> {
+            ModInfo selected = currentModInfo;
+            JTextArea note = new JTextArea(ModList.getNote(selected), 6, 32);
+            note.setLineWrap(true);
+            note.setWrapStyleWord(true);
+            note.getAccessibleContext().setAccessibleName("Mod note");
+            if (JOptionPane.showConfirmDialog(this, new JScrollPane(note), "Note — " + selected.Name,
+                JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
+                ModList.setNote(selected, note.getText());
+                updateNoteButton();
+            }
+        });
+
+        JPanel descriptionPanel = new JPanel(new BorderLayout(0, ThemeManager.scale(4)));
+        descriptionPanel.add(descScroller, BorderLayout.CENTER);
+        descriptionPanel.add(editNote, BorderLayout.SOUTH);
+        descriptionPanel.setMinimumSize(new Dimension(ThemeManager.scale(120), 0));
+
+        JScrollPane details = new JScrollPane(infoPanel);
+        details.setBorder(null);
+        details.setMinimumSize(new Dimension(ThemeManager.scale(140), 0));
+        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, descriptionPanel, details);
+        split.setContinuousLayout(true);
+        split.setResizeWeight(0.6);
+        split.setDividerLocation(ThemeManager.scale(335));
+        split.setBorder(null);
+        panel.setMinimumSize(new Dimension(ThemeManager.scale(280), 0));
+        panel.add(split, BorderLayout.CENTER);
 
         return panel;
     }
@@ -790,8 +829,27 @@ public class ModSelectWindow extends JFrame
 
     void setModInfo(ModInfo info)
     {
+        if (editNote == null) {
+            return;
+        }
         currentModInfo = info;
 
+        if (info == null) {
+            name.setTitle("Mod Info");
+            authors.setText("");
+            modVersion.setText("");
+            mtsVersion.setText("");
+            stsVersion.setText("");
+            description.setText("");
+            credits.setText("");
+            status.setText("");
+            editNote.setEnabled(false);
+            editNote.setText("Edit note…");
+            modBannerNoticePanel.remove(modUpdateBanner);
+            modBannerNoticePanel.revalidate();
+            repaint();
+            return;
+        }
         name.setTitle(info.Name);
         authors.setText(String.join(", ", info.Authors));
         if (info.ModVersion != null) {
@@ -810,6 +868,8 @@ public class ModSelectWindow extends JFrame
             stsVersion.setText(" ");
         }
         description.setText(info.Description);
+        description.setCaretPosition(0);
+        updateNoteButton();
         credits.setText(info.Credits);
 
         status.setText(info.statusMsg);
@@ -817,6 +877,13 @@ public class ModSelectWindow extends JFrame
         setModUpdateBanner(info);
 
         repaint();
+    }
+
+    private void updateNoteButton()
+    {
+        String note = ModList.getNote(currentModInfo);
+        editNote.setEnabled(true);
+        editNote.setText(note.isEmpty() ? "Add note…" : "View / edit note…");
     }
 
     synchronized void setModUpdateBanner(ModInfo info)

@@ -34,13 +34,17 @@ public class JModPanelCheckBoxList extends JList<ModPanel> {
         setCellRenderer(new CellRenderer());
         setBackground(ThemeManager.BG_SECONDARY);
 
+        addListSelectionListener(event -> {
+            if (!event.getValueIsAdjusting()) {
+                ModPanel selected = getSelectedValue();
+                parent.setModInfo(selected == null ? null : selected.info);
+            }
+        });
         addMouseListener(new MouseAdapter() {
             public void mouseClicked(MouseEvent e) {
                 int index = locationToIndex(e.getPoint());
                 if (index != -1) {
                     ModPanel modPanel = getModel().getElementAt(index);
-                    parent.setModInfo(modPanel.info);
-
                     if (e.getX() <= modPanel.checkBox.getWidth()) {
                         if (modPanel.checkBox.isEnabled()) {
                             modPanel.checkBox.setSelected(!modPanel.checkBox.isSelected());

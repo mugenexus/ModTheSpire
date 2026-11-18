@@ -17,8 +17,13 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 
 public class ModList
@@ -36,6 +41,7 @@ public class ModList
     private static class ModListSaveData
     {
         public String defaultList = DEFAULT_LIST;
+        public Map<String, String> notes = new HashMap<>();
         public Map<String, List<String>> lists = new HashMap<>();
     }
 
@@ -71,7 +77,13 @@ public class ModList
             convertOldConfig(oldConfig);
         } else if (Files.exists(Paths.get(CFG_FILE))) {
             try {
-                String data = new String(Files.readAllBytes(Paths.get(CFG_FILE)));
+                byte[] bytes = Files.readAllBytes(Paths.get(CFG_FILE));
+                String data;
+                try {
+                    data = StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(bytes)).toString();
+                } catch (CharacterCodingException e) {
+                    data = new String(bytes);
+                }
                 Gson gson = new Gson();
                 saveData = gson.fromJson(data, ModListSaveData.class);
             } catch (JsonSyntaxException e) {
@@ -86,6 +98,9 @@ public class ModList
 
         if (saveData == null) {
             saveData = new ModListSaveData();
+        }
+        if (saveData.notes == null) {
+            saveData.notes = new HashMap<>();
         }
 
         return new ModList(saveData.defaultList);
@@ -109,7 +124,7 @@ public class ModList
             // write new config
             Gson gson = new GsonBuilder().setPrettyPrinting().create();
             String data = gson.toJson(saveData);
-            Files.write(Paths.get(CFG_FILE), data.getBytes());
+            Files.write(Paths.get(CFG_FILE), data.getBytes(StandardCharsets.UTF_8));
             // then delete the old config
             oldConfig.delete();
         } catch (SAXException | ParserConfigurationException | IOException e) {
@@ -126,6 +141,41 @@ public class ModList
         name = list;
         saveData.lists.putIfAbsent(name, Collections.emptyList());
         mods = saveData.lists.getOrDefault(name, Collections.emptyList());
+    }
+
+    public static void loadCombined(File[] selected, List<String> profiles,
+        DefaultListModel<ModPanel> model, ModInfo[] info, JModPanelCheckBoxList parent)
+    {
+        Set<String> combined = new LinkedHashSet<>();
+        for (File file : selected) {
+            combined.add(file.getName());
+        }
+        for (String profile : profiles) {
+            combined.addAll(saveData.lists.getOrDefault(profile, Collections.emptyList()));
+        }
+        ModList list = new ModList(getDefaultList());
+        list.mods = new ArrayList<>(combined);
+        list.loadModsInOrder(model, info, parent);
+    }
+
+    private static String noteKey(ModInfo info)
+    {
+        return info.ID != null && !info.ID.isEmpty() ? "id:" + info.ID : "jar:" + info.jarURL;
+    }
+
+    public static String getNote(ModInfo info)
+    {
+        return saveData.notes.getOrDefault(noteKey(info), "");
+    }
+
+    public static void setNote(ModInfo info, String note)
+    {
+        if (note.trim().isEmpty()) {
+            saveData.notes.remove(noteKey(info));
+        } else {
+            saveData.notes.put(noteKey(info), note);
+        }
+        save();
     }
 
     public String getName()
@@ -156,7 +206,7 @@ public class ModList
         // O(n^2) will be unhappy with lots of mods
         for (int i = 0; i < mods.size(); ++i) {
             for (int j = 0; j < modFiles.length; ++j) {
-                if (mods.get(i).equals(modFiles[j].getName())) {
+                if (modFiles[j] != null && mods.get(i).equals(modFiles[j].getName())) {
                     loadOrder.add(new ModDescriptor(modFiles[j], info[j], true));
                     foundMods.add(i);
                 }
@@ -179,7 +229,7 @@ public class ModList
                     found = true;
                 }
             }
-            if (!found) {
+            if (!found && modFiles[i] != null) {
                 loadOrder.add(new ModDescriptor(modFiles[i], info[i], false));
             }
         }
@@ -206,12 +256,29 @@ public class ModList
         save();
     }
 
+    public static void select(String list)
+    {
+        saveData.defaultList = list;
+        save();
+    }
+
     private static void save()
     {
         try {
             Gson gson = new GsonBuilder().setPrettyPrinting().create();
             String data = gson.toJson(saveData);
-            Files.write(Paths.get(CFG_FILE), data.getBytes());
+            Path target = Paths.get(CFG_FILE).toAbsolutePath();
+            Path temporary = Files.createTempFile(target.getParent(), "mod_lists-", ".json");
+            try {
+                Files.write(temporary, data.getBytes(StandardCharsets.UTF_8));
+                try {
+                    Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                } catch (AtomicMoveNotSupportedException e) {
+                    Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
+                }
+            } finally {
+                Files.deleteIfExists(temporary);
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
