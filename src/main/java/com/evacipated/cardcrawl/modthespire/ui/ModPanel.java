@@ -227,6 +227,7 @@ public class ModPanel extends JPanel
     {
         JLabel name = new JLabel();
         JLabel version = new JLabel();
+        JLabel order = new JLabel();
 
         public InfoPanel()
         {
@@ -237,7 +238,11 @@ public class ModPanel extends JPanel
             name.setText(displayName(info));
             name.setFont(name.getFont().deriveFont(Font.BOLD, (float) ThemeManager.scale(13)));
             name.setForeground(ThemeManager.TEXT_PRIMARY);
+            name.putClientProperty("html.disable", true);
             add(name, BorderLayout.CENTER);
+            order.setForeground(ThemeManager.TEXT_SECONDARY);
+            order.setPreferredSize(new Dimension(ThemeManager.scale(38), 0));
+            add(order, BorderLayout.WEST);
 
             version.setOpaque(false);
             version.setFont(version.getFont().deriveFont(Font.PLAIN, (float) ThemeManager.scale(11)));
@@ -245,10 +250,17 @@ public class ModPanel extends JPanel
             if (info.ModVersion != null) {
                 version.setText("v" + info.ModVersion.toString());
             } else {
-                version.setText("missing version");
+                version.setText("—");
                 version.setForeground(ThemeManager.STATUS_WARNING);
             }
-            add(version, BorderLayout.SOUTH);
+            JPanel columns = new JPanel(new GridLayout(1, 2, ThemeManager.scale(6), 0));
+            columns.setOpaque(false);
+            columns.setPreferredSize(new Dimension(ThemeManager.scale(140), 0));
+            columns.add(version);
+            JLabel source = new JLabel(info.isWorkshop ? "工坊" : "本地");
+            source.setForeground(ThemeManager.TEXT_SECONDARY);
+            columns.add(source);
+            add(columns, BorderLayout.EAST);
         }
 
         public void resetColors() {

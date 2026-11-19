@@ -83,6 +83,7 @@ public class JModPanelCheckBoxList extends JList<ModPanel> {
         for (int i = 0; i < getModel().getSize(); i++) {
             getModel().getElementAt(i).recalcModWarnings(this);
         }
+        parent.scheduleLaunchSummary();
     }
 
     public JModPanelCheckBoxList(ModSelectWindow parent, DefaultListModel<ModPanel> model) {
@@ -176,6 +177,7 @@ public class JModPanelCheckBoxList extends JList<ModPanel> {
                 return hiddenItem;
             }
 
+            value.infoPanel.order.setText(Integer.toString(index + 1));
             value.infoPanel.name.setText(ModPanel.displayName(value.info));
             // 使用主题颜色
             if (isSelected) {

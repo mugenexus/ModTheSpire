@@ -112,6 +112,11 @@ public class Loader
 
     public static void main(String[] args)
     {
+        // Use Java2D's software path to avoid stale window surfaces on Windows.
+        if (System.getProperty("os.name", "").startsWith("Windows")
+            && System.getProperty("sun.java2d.d3d") == null) {
+            System.setProperty("sun.java2d.d3d", "false");
+        }
         List<String> argList = Arrays.asList(args);
 
         // Restart MTS if jre1.8.0_51 is detected

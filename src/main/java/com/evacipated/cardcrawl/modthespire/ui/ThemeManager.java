@@ -105,6 +105,10 @@ public final class ThemeManager {
             // 使用 FlatLaf.setup() 进行初始化
             if (FlatDarkLaf.setup()) {
                 flatLafInitialized = true;
+                if (System.getProperty("os.name", "").startsWith("Windows")) {
+                    JFrame.setDefaultLookAndFeelDecorated(false);
+                    JDialog.setDefaultLookAndFeelDecorated(false);
+                }
 
                 // 设置全局字体
                 setGlobalFont();
