@@ -65,6 +65,7 @@ public class ModSelectWindow extends JFrame
     private JTextArea description;
     private JSplitPane detailsSplit;
     private JButton editNote;
+    private Runnable filterMods;
     private String activeProfile;
     private File[] profileSelection;
     private JTextArea credits;
@@ -487,7 +488,7 @@ public class ModSelectWindow extends JFrame
         });
         toolbar.add(mergeProfiles);
 
-        Runnable filterModList = () -> {
+        filterMods = () -> {
             String filterText = filter.getText().trim().toLowerCase();
             String[] filterKeys = filterText.length() == 0 ? null : filterText.split("\\s+");
             for (int i = 0; i < model.size(); i++) {
@@ -500,17 +501,17 @@ public class ModSelectWindow extends JFrame
         filter.getDocument().addDocumentListener(new DocumentListener() {
             @Override
             public void insertUpdate(DocumentEvent e) {
-                filterModList.run();
+                filterMods.run();
             }
 
             @Override
             public void removeUpdate(DocumentEvent e) {
-                filterModList.run();
+                filterMods.run();
             }
 
             @Override
             public void changedUpdate(DocumentEvent e) {
-                filterModList.run();
+                filterMods.run();
             }
         });
 
@@ -619,18 +620,7 @@ public class ModSelectWindow extends JFrame
 
         editNote = new JButton("编辑备注");
         editNote.setEnabled(false);
-        editNote.addActionListener(event -> {
-            ModInfo selected = currentModInfo;
-            JTextArea note = new JTextArea(ModList.getNote(selected), 6, 32);
-            note.setLineWrap(true);
-            note.setWrapStyleWord(true);
-            note.getAccessibleContext().setAccessibleName("模组备注");
-            if (JOptionPane.showConfirmDialog(this, new JScrollPane(note), "备注 · " + selected.Name,
-                JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
-                ModList.setNote(selected, note.getText());
-                updateNoteButton();
-            }
-        });
+        editNote.addActionListener(event -> editModNote(currentModInfo));
 
         JPanel descriptionPanel = new JPanel(new BorderLayout(0, ThemeManager.scale(4)));
         descriptionPanel.add(descScroller, BorderLayout.CENTER);
@@ -939,7 +929,7 @@ public class ModSelectWindow extends JFrame
             repaint();
             return;
         }
-        name.setTitle(info.Name);
+        name.setTitle(ModPanel.displayName(info));
         authors.setText(String.join(", ", info.Authors));
         if (info.ModVersion != null) {
             modVersion.setText(info.ModVersion.toString());
@@ -967,6 +957,20 @@ public class ModSelectWindow extends JFrame
         setModUpdateBanner(info);
 
         repaint();
+    }
+
+    void editModNote(ModInfo selected)
+    {
+        JTextArea note = new JTextArea(ModList.getNote(selected), 6, 32);
+        note.setLineWrap(true);
+        note.setWrapStyleWord(true);
+        note.getAccessibleContext().setAccessibleName("模组备注");
+        if (JOptionPane.showConfirmDialog(this, new JScrollPane(note), "备注 · " + selected.Name,
+            JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
+            ModList.setNote(selected, note.getText());
+            setModInfo(selected);
+            filterMods.run();
+        }
     }
 
     private void updateNoteButton()

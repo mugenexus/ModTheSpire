@@ -67,6 +67,12 @@ public class ModPanel extends JPanel
         return missing.toArray(returnType);
     }
 
+    static String displayName(ModInfo info)
+    {
+        String note = com.evacipated.cardcrawl.modthespire.ModList.getNote(info).trim();
+        return note.isEmpty() ? info.Name : note.split("\\R", 2)[0].trim();
+    }
+
     public ModPanel(ModInfo info, File modFile, JModPanelCheckBoxList parent) {
         this.info = info;
         this.modFile = modFile;
@@ -202,7 +208,7 @@ public class ModPanel extends JPanel
             System.out.println("ModPanel.filter failed to get workshop info of " + info.ID + ": " + ex);
         }
 
-        String modInfoKey = String.format("%s %s %s %s", info.ID, info.Name, String.join(" ", info.Authors), workshopInfoKey).toLowerCase();
+        String modInfoKey = String.format("%s %s %s %s", info.ID, info.Name + " " + displayName(info), String.join(" ", info.Authors), workshopInfoKey).toLowerCase();
         boolean isFilteredOut = false;
         for (String filterKey : filterKeys) {
             if (!modInfoKey.contains(filterKey)) {
@@ -228,7 +234,7 @@ public class ModPanel extends JPanel
             setOpaque(false);
 
             name.setOpaque(false);
-            name.setText(info.Name);
+            name.setText(displayName(info));
             name.setFont(name.getFont().deriveFont(Font.BOLD, (float) ThemeManager.scale(13)));
             name.setForeground(ThemeManager.TEXT_PRIMARY);
             add(name, BorderLayout.CENTER);

@@ -85,7 +85,7 @@ final class ModCoverList extends JList<ModPanel>
             card.setBackground(selected ? ThemeManager.BG_SELECTED : ThemeManager.BG_SECONDARY);
             enabled.setSelected(mod.isSelected());
             enabled.setEnabled(mod.checkBox.isEnabled());
-            title.setText(mod.info.Name);
+            title.setText(ModPanel.displayName(mod.info));
             title.setForeground(mod.checkBox.isEnabled() ? ThemeManager.TEXT_PRIMARY : ThemeManager.STATUS_ERROR);
             Icon icon = cover(mod);
             image.setIcon(icon);
@@ -111,7 +111,7 @@ final class ModCoverList extends JList<ModPanel>
             checked.setSelected(mod.isSelected());
             checked.setEnabled(mod.checkBox.isEnabled());
             rowName.setForeground(mod.checkBox.isEnabled() ? ThemeManager.TEXT_PRIMARY : ThemeManager.STATUS_ERROR);
-            rowName.setText(mod.info.Name);
+            rowName.setText(ModPanel.displayName(mod.info));
             version.setText(mod.info.ModVersion == null ? "" : "v" + mod.info.ModVersion);
             return row;
         });
@@ -199,7 +199,8 @@ final class ModCoverList extends JList<ModPanel>
                 if (SwingUtilities.isRightMouseButton(event) && dragged != null) {
                     ModPanel target = at(section, event.getPoint());
                     if (!moved) {
-                        chooseCover(dragged);
+                        ModPanel mod = dragged;
+                        list.showModMenu(section, event.getPoint(), mod, () -> chooseCover(mod));
                     } else if (target != null && target != dragged) {
                         move(dragged, target, list);
                     }

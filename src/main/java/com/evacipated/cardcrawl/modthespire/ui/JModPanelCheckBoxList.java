@@ -43,8 +43,14 @@ public class JModPanelCheckBoxList extends JList<ModPanel> {
         addMouseListener(new MouseAdapter() {
             public void mouseClicked(MouseEvent e) {
                 int index = locationToIndex(e.getPoint());
-                if (index != -1) {
+                if (index != -1 && getCellBounds(index, index).contains(e.getPoint())) {
                     ModPanel modPanel = getModel().getElementAt(index);
+                    if (SwingUtilities.isRightMouseButton(e)) {
+                        setSelectedIndex(index);
+                        showModMenu(JModPanelCheckBoxList.this, e.getPoint(), modPanel, null);
+                        return;
+                    }
+                    if (!SwingUtilities.isLeftMouseButton(e)) return;
                     if (e.getX() <= modPanel.checkBox.getWidth()) {
                         if (modPanel.checkBox.isEnabled()) {
                             modPanel.checkBox.setSelected(!modPanel.checkBox.isSelected());
@@ -57,6 +63,20 @@ public class JModPanelCheckBoxList extends JList<ModPanel> {
 
         // force mods to calc their backgrounds
         publishBoxChecked();
+    }
+
+    void showModMenu(JComponent section, Point point, ModPanel mod, Runnable editCover)
+    {
+        JPopupMenu menu = new JPopupMenu();
+        JMenuItem note = new JMenuItem("设置模组备注");
+        note.addActionListener(event -> parent.editModNote(mod.info));
+        menu.add(note);
+        if (editCover != null) {
+            JMenuItem cover = new JMenuItem("设置封面");
+            cover.addActionListener(event -> editCover.run());
+            menu.add(cover);
+        }
+        menu.show(section, point.x, point.y);
     }
 
     public void publishBoxChecked() {
@@ -156,6 +176,7 @@ public class JModPanelCheckBoxList extends JList<ModPanel> {
                 return hiddenItem;
             }
 
+            value.infoPanel.name.setText(ModPanel.displayName(value.info));
             // 使用主题颜色
             if (isSelected) {
                 value.setBackground(ThemeManager.BG_SELECTED);
