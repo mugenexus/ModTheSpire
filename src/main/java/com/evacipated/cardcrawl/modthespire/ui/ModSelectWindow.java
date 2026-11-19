@@ -203,7 +203,7 @@ public class ModSelectWindow extends JFrame
 
     private void initUI(boolean skipLauncher)
     {
-        setTitle("杀戮尖塔 · 模组管理器  " + Loader.MTS_VERSION);
+        setTitle("ModTheSpire Alter  " + Loader.MTS_VERSION);
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         setResizable(true);
 

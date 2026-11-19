@@ -1,10 +1,10 @@
-# ModTheSpire 中文增强版
+# ModTheSpire Alter
 
 《杀戮尖塔》模组加载器，可通过 Steam 的 **Play with Mods** 打开中文启动器。
 
 ## 安装
 
-1. 下载并解压 [最新版](https://github.com/mugenexus/ModTheSpire/releases/latest)。
+1. 下载并解压 [最新版](https://github.com/mugenexus/ModTheSpire-Alter/releases/latest)。
 2. 通过 Steam 启动时，保留 [原版 ModTheSpire](https://steamcommunity.com/sharedfiles/filedetails/?id=1605060445) 的工坊订阅。关闭启动器，在对应 Steam 库的 `steamapps/workshop/content/646570/1605060445/` 中备份并替换 `ModTheSpire.jar`，然后选择 **Play with Mods**。Steam 重新下载工坊内容时可能覆盖改版。
 3. 手动启动时，将 `ModTheSpire.jar` 与对应系统的启动脚本放在游戏目录。Windows 运行 `MTS.cmd`，Linux 运行 `sh MTS.sh`。Linux 脚本依次查找游戏自带的 Java 8、`JAVA_HOME` 和 `PATH`。本地模组 JAR 放在游戏目录的 `mods/` 中。
 
