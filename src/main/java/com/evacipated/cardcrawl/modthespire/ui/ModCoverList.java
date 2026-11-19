@@ -28,13 +28,10 @@ final class ModCoverList extends JList<ModPanel>
     private static final int MAX_IMAGE_BYTES = 8 * 1024 * 1024;
     private final DefaultListModel<ModPanel> source;
     private final DefaultListModel<ModPanel> visible = new DefaultListModel<>();
-    private final DefaultListModel<ModPanel> withoutCover = new DefaultListModel<>();
-    private final JList<ModPanel> rows = new JList<>(withoutCover);
-    private final JPanel view = new JPanel(new BorderLayout(0, ThemeManager.scale(6)));
-    private final JScrollPane rowScroll = new JScrollPane(rows);
     private final JScrollPane gridScroll = new JScrollPane(this);
     private boolean refreshPending;
     private boolean rebuilding;
+    private final CoverCache cache = new CoverCache();
     private final Map<String, ImageIcon> thumbnails = new HashMap<>();
     private final ExecutorService downloads = Executors.newFixedThreadPool(3, task -> {
         Thread thread = new Thread(task, "模组封面");
@@ -49,8 +46,8 @@ final class ModCoverList extends JList<ModPanel>
         setLayoutOrientation(HORIZONTAL_WRAP);
         setVisibleRowCount(0);
         setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        setFixedCellWidth(ThemeManager.scale(122));
-        setFixedCellHeight(ThemeManager.scale(138));
+        setFixedCellWidth(ThemeManager.scale(136));
+        setFixedCellHeight(ThemeManager.scale(164));
         getAccessibleContext().setAccessibleName("模组封面");
 
         setBackground(ThemeManager.BG_PRIMARY);
@@ -61,6 +58,8 @@ final class ModCoverList extends JList<ModPanel>
             ThemeManager.scale(3), ThemeManager.scale(3)));
         tile.add(card);
         JLabel image = new JLabel("", SwingConstants.CENTER);
+        Image steam = ((ImageIcon) ModSelectWindow.ICON_WORKSHOP).getImage();
+        Icon fallbackCover = new ImageIcon(steam.getScaledInstance(ThemeManager.scale(42), -1, Image.SCALE_SMOOTH));
         image.setPreferredSize(new Dimension(0, ThemeManager.scale(81)));
         JPanel caption = new JPanel(new BorderLayout(ThemeManager.scale(3), 0));
         caption.setOpaque(false);
@@ -74,11 +73,17 @@ final class ModCoverList extends JList<ModPanel>
         title.setFont(getFont().deriveFont(Font.BOLD));
         title.setMargin(new Insets(0, 0, 0, 0));
         caption.add(enabled, BorderLayout.WEST);
-        caption.add(title, BorderLayout.CENTER);
+        JPanel labelStack = new JPanel(new BorderLayout());
+        labelStack.setOpaque(false);
+        JLabel cardVersion = new JLabel();
+        cardVersion.setForeground(ThemeManager.TEXT_SECONDARY);
+        labelStack.add(title, BorderLayout.CENTER);
+        labelStack.add(cardVersion, BorderLayout.SOUTH);
+        caption.add(labelStack, BorderLayout.CENTER);
         card.add(image, BorderLayout.CENTER);
         card.add(caption, BorderLayout.SOUTH);
         setCellRenderer((grid, mod, index, selected, focused) -> {
-            Color border = selected ? ThemeManager.ACCENT_COLOR : ThemeManager.BORDER_DEFAULT;
+            Color border = selected ? ThemeManager.ACCENT_COLOR : mod.isSelected() ? ThemeManager.STATUS_SUCCESS : ThemeManager.BORDER_DEFAULT;
             int padding = ThemeManager.scale(5);
             card.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(border, 1, true),
                 BorderFactory.createEmptyBorder(padding, padding, padding, padding)));
@@ -86,43 +91,17 @@ final class ModCoverList extends JList<ModPanel>
             enabled.setSelected(mod.isSelected());
             enabled.setEnabled(mod.checkBox.isEnabled());
             title.setText(ModPanel.displayName(mod.info));
+            cardVersion.setText(mod.info.ModVersion == null ? "" : "v" + mod.info.ModVersion);
             title.setForeground(mod.checkBox.isEnabled() ? ThemeManager.TEXT_PRIMARY : ThemeManager.STATUS_ERROR);
             Icon icon = cover(mod);
-            image.setIcon(icon);
+            image.setIcon(icon == null ? fallbackCover : icon);
+            image.setOpaque(icon == null);
+            image.setBackground(new Color(52, 45, 78));
             return tile;
         });
-        rows.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        JPanel row = new JPanel(new BorderLayout(ThemeManager.scale(6), 0));
-        row.setBorder(BorderFactory.createEmptyBorder(0, ThemeManager.scale(6), 0, ThemeManager.scale(8)));
-        JCheckBox checked = new JCheckBox();
-        checked.setOpaque(false);
-        checked.setBorder(BorderFactory.createEmptyBorder());
-        JLabel rowName = new JLabel();
-        rowName.putClientProperty("html.disable", true);
-        JLabel version = new JLabel();
-        version.setForeground(ThemeManager.TEXT_SECONDARY);
-        row.add(checked, BorderLayout.WEST);
-        row.add(rowName, BorderLayout.CENTER);
-        row.add(version, BorderLayout.EAST);
-        rows.setFixedCellHeight(Math.max(ThemeManager.scale(26), rowName.getPreferredSize().height + ThemeManager.scale(6)));
-        rows.setCellRenderer((section, mod, index, selected, focused) -> {
-            row.setBackground(selected ? ThemeManager.BG_SELECTED : index % 2 == 0
-                ? ThemeManager.BG_SECONDARY : ThemeManager.BG_PRIMARY);
-            checked.setSelected(mod.isSelected());
-            checked.setEnabled(mod.checkBox.isEnabled());
-            rowName.setForeground(mod.checkBox.isEnabled() ? ThemeManager.TEXT_PRIMARY : ThemeManager.STATUS_ERROR);
-            rowName.setText(ModPanel.displayName(mod.info));
-            version.setText(mod.info.ModVersion == null ? "" : "v" + mod.info.ModVersion);
-            return row;
-        });
-        rows.getAccessibleContext().setAccessibleName("无封面模组");
-        rowScroll.setBorder(BorderFactory.createTitledBorder(
-            BorderFactory.createLineBorder(ThemeManager.BORDER_DEFAULT), "无封面模组"));
         gridScroll.setBorder(BorderFactory.createLineBorder(ThemeManager.BORDER_DEFAULT));
         gridScroll.getVerticalScrollBar().setUnitIncrement(ThemeManager.scale(24));
-        view.add(gridScroll, BorderLayout.CENTER);
         attachInteractions(this, list);
-        attachInteractions(rows, list);
         source.addListDataListener(new ListDataListener() {
             @Override public void intervalAdded(ListDataEvent event) { refresh(); }
             @Override public void intervalRemoved(ListDataEvent event) { refresh(); }
@@ -130,22 +109,20 @@ final class ModCoverList extends JList<ModPanel>
         });
     }
 
-    JPanel view()
+    JScrollPane view()
     {
-        return view;
+        return gridScroll;
     }
 
     void selectMod(ModPanel mod)
     {
         setSelectedValue(mod, true);
-        rows.setSelectedValue(mod, true);
     }
 
     private void attachInteractions(JList<ModPanel> section, JModPanelCheckBoxList list)
     {
         section.addListSelectionListener(event -> {
             if (!event.getValueIsAdjusting() && !rebuilding && section.isShowing() && section.getSelectedValue() != null) {
-                (section == rows ? this : rows).clearSelection();
                 list.setSelectedValue(section.getSelectedValue(), false);
             }
         });
@@ -237,31 +214,21 @@ final class ModCoverList extends JList<ModPanel>
 
     private void rebuild()
     {
-        ModPanel selection = getSelectedValue() == null ? rows.getSelectedValue() : getSelectedValue();
+        ModPanel selection = getSelectedValue();
         rebuilding = true;
         try {
             visible.clear();
-            withoutCover.clear();
             for (int i = 0; i < source.getSize(); i++) {
                 ModPanel mod = source.get(i);
                 if (!mod.isFilteredOut()) {
-                    (cover(mod) == null ? withoutCover : visible).addElement(mod);
+                    visible.addElement(mod);
                 }
             }
-            view.removeAll();
-            if (!withoutCover.isEmpty()) {
-                int rowHeight = rows.getCellBounds(0, 0).height;
-                int height = rowHeight * Math.min(6, withoutCover.size()) + rowScroll.getInsets().top + rowScroll.getInsets().bottom;
-                rowScroll.setPreferredSize(new Dimension(0, height));
-                view.add(rowScroll, visible.isEmpty() ? BorderLayout.CENTER : BorderLayout.NORTH);
-            }
-            if (!visible.isEmpty() || withoutCover.isEmpty()) view.add(gridScroll, BorderLayout.CENTER);
             selectMod(selection);
         } finally {
             rebuilding = false;
         }
-        view.revalidate();
-        view.repaint();
+        repaint();
     }
 
     @Override public String getToolTipText(MouseEvent event)
@@ -280,7 +247,7 @@ final class ModCoverList extends JList<ModPanel>
     {
         if (mod != null) {
             mod.setSelected(!mod.isSelected());
-            view.repaint();
+            repaint();
         }
     }
 
@@ -344,22 +311,47 @@ final class ModCoverList extends JList<ModPanel>
         if (!thumbnails.containsKey(source)) {
             String location = source;
             thumbnails.put(location, null);
+            long generation = cache.generation();
             downloads.execute(() -> {
-                ImageIcon image = null;
+                File local = location.startsWith("file:") ? new File(location.substring(5)) : null;
+                String key = "v1:" + ThemeManager.getScaleFactor() + ":" + location
+                    + (local == null ? "" : ":" + local.lastModified() + ":" + local.length());
+                ImageIcon image = cache.read(key);
                 try {
-                    image = location.startsWith("file:") ? thumbnail(new File(location.substring(5)))
-                        : download(location);
+                    if (image == null) {
+                        image = local == null ? download(location) : thumbnail(local);
+                        if (image != null) cache.write(key, image, generation);
+                    }
                 } catch (IOException ignored) {
                     // Covers are optional. Keep the placeholder when a source becomes unavailable.
                 }
                 ImageIcon result = image;
                 SwingUtilities.invokeLater(() -> {
                     if (thumbnails.get(location) == null) thumbnails.put(location, result);
-                    if (result != null) refresh();
+                    if (result != null) repaint();
                 });
             });
         }
         return thumbnails.get(source);
+    }
+
+    void showCacheDialog(Component parent)
+    {
+        try {
+            long bytes = cache.size();
+            String size = bytes < 1024 ? bytes + " B" : bytes < 1024 * 1024
+                ? String.format(Locale.ROOT, "%.1f KB", bytes / 1024.0)
+                : String.format(Locale.ROOT, "%.1f MB", bytes / (1024.0 * 1024));
+            Object[] actions = {"清除缓存", "关闭"};
+            int choice = JOptionPane.showOptionDialog(parent, "封面缩略图占用 " + size, "封面缓存",
+                JOptionPane.DEFAULT_OPTION, JOptionPane.PLAIN_MESSAGE, null, actions, actions[1]);
+            if (choice == 0) {
+                cache.clear();
+                JOptionPane.showMessageDialog(parent, "封面缓存已清除。", "封面缓存", JOptionPane.INFORMATION_MESSAGE);
+            }
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(parent, e.getMessage(), "无法管理封面缓存", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     private ImageIcon download(String location) throws IOException
@@ -404,8 +396,8 @@ final class ModCoverList extends JList<ModPanel>
                 int step = Math.max(1, Math.max(width, height) / 256);
                 params.setSourceSubsampling(step, step, 0, 0);
                 BufferedImage image = reader.read(0, params);
-                double scale = Math.min((double) ThemeManager.scale(108) / image.getWidth(),
-                    (double) ThemeManager.scale(78) / image.getHeight());
+                double scale = Math.min((double) ThemeManager.scale(116) / image.getWidth(),
+                    (double) ThemeManager.scale(106) / image.getHeight());
                 return new ImageIcon(image.getScaledInstance(Math.max(1, (int)(image.getWidth() * scale)),
                     Math.max(1, (int)(image.getHeight() * scale)), Image.SCALE_SMOOTH));
             } finally {

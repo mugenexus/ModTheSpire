@@ -143,19 +143,20 @@ public class ModList
         mods = saveData.lists.getOrDefault(name, Collections.emptyList());
     }
 
-    public static void loadCombined(File[] selected, List<String> profiles,
-        DefaultListModel<ModPanel> model, ModInfo[] info, JModPanelCheckBoxList parent)
+    public static File[] getModsForProfiles(List<String> profiles, File[] available)
     {
-        Set<String> combined = new LinkedHashSet<>();
-        for (File file : selected) {
-            combined.add(file.getName());
+        Map<String, File> byName = new HashMap<>();
+        for (File file : available) {
+            byName.putIfAbsent(file.getName(), file);
         }
+        Set<File> selected = new LinkedHashSet<>();
         for (String profile : profiles) {
-            combined.addAll(saveData.lists.getOrDefault(profile, Collections.emptyList()));
+            for (String name : saveData.lists.getOrDefault(profile, Collections.emptyList())) {
+                File file = byName.get(name);
+                if (file != null) selected.add(file);
+            }
         }
-        ModList list = new ModList(getDefaultList());
-        list.mods = new ArrayList<>(combined);
-        list.loadModsInOrder(model, info, parent);
+        return selected.toArray(new File[0]);
     }
 
     private static String noteKey(ModInfo info)

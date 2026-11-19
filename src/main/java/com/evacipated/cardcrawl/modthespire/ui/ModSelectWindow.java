@@ -67,6 +67,7 @@ public class ModSelectWindow extends JFrame
     private JButton editNote;
     private Runnable filterMods;
     private String activeProfile;
+    private List<String> launchProfiles = new ArrayList<>();
     private File[] profileSelection;
     private JTextArea credits;
 
@@ -88,8 +89,8 @@ public class ModSelectWindow extends JFrame
     {
         Properties properties = new Properties();
         properties.setProperty("cover-view", "true");
-        properties.setProperty("mods-divider", "280");
-        properties.setProperty("description-divider", "0");
+        properties.setProperty("browse-divider", "0");
+        properties.setProperty("description-height", "180");
         properties.setProperty("x", "center");
         properties.setProperty("y", "center");
         properties.setProperty("width", Integer.toString(BASE_WIDTH));
@@ -216,7 +217,8 @@ public class ModSelectWindow extends JFrame
         JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
         splitPane.setLeftComponent(makeModListPanel());
         splitPane.setRightComponent(makeInfoPanel());
-        splitPane.setDividerLocation(ThemeManager.scale(280));
+        splitPane.setDividerLocation(Math.max(ThemeManager.scale(250), location.width - ThemeManager.scale(295)));
+        splitPane.setResizeWeight(1.0);
         splitPane.setDividerSize(6);
         splitPane.setContinuousLayout(true);
         splitPane.setBorder(null);
@@ -229,9 +231,9 @@ public class ModSelectWindow extends JFrame
             addWindowListener(new WindowAdapter() {
                 @Override
                 public void windowOpened(WindowEvent event) {
-                    rememberDivider(splitPane, "mods-divider");
+                    rememberDivider(splitPane, "browse-divider");
                     validate();
-                    rememberDivider(detailsSplit, "description-divider");
+                    rememberDivider(detailsSplit, "description-height");
                 }
             });
         }
@@ -341,8 +343,17 @@ public class ModSelectWindow extends JFrame
             }
 
             File[] checkedMods = modList.getCheckedMods();
-            ModList.save(activeProfile, checkedMods);
-            File[] selectedMods = Loader.manualModIds != null ? modList.getAllMods() : checkedMods;
+            if (!Arrays.equals(profileSelection, checkedMods)) {
+                ModList.save(activeProfile, checkedMods);
+            }
+            File[] selectedMods;
+            if (Loader.manualModIds != null) {
+                selectedMods = modList.getAllMods();
+            } else if (launchProfiles.isEmpty()) {
+                selectedMods = checkedMods;
+            } else {
+                selectedMods = ModList.getModsForProfiles(launchProfiles, modList.getAllMods());
+            }
 
             Thread t = new Thread(() -> {
                 Loader.runMods(selectedMods);
@@ -395,6 +406,7 @@ public class ModSelectWindow extends JFrame
         toolbar.add(toggleAllBtn);
 
         JComboBox<String> profilesList = new JComboBox<>(ModList.getAllModListNames().toArray(new String[0]));
+        JButton chooseProfiles = new JButton("同时启用配置组");
         JButton addProfile = new JButton("+");
         JButton delProfile = new JButton("-");
 
@@ -466,27 +478,43 @@ public class ModSelectWindow extends JFrame
                 profilesList.setSelectedItem(ModList.DEFAULT_LIST);
                 profilesList.removeItem(profileName);
                 ModList.delete(profileName);
+                launchProfiles.remove(profileName);
+                updateProfileButton(chooseProfiles);
             }
         });
         profilesPanel.add(delProfile, c);
 
-        JButton mergeProfiles = new JButton("合并配置组");
-        mergeProfiles.setToolTipText("将其他配置组的模组加入当前勾选");
-        mergeProfiles.addActionListener(event -> {
-            JList<String> choices = new JList<>(ModList.getAllModListNames().stream()
-                .filter(profile -> !profile.equals(activeProfile)).sorted().toArray(String[]::new));
-            if (choices.getModel().getSize() == 0) {
-                JOptionPane.showMessageDialog(this, "请先创建另一个配置组。");
-                return;
-            }
-            if (JOptionPane.showConfirmDialog(this, new JScrollPane(choices), "合并到 " + activeProfile,
-                JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION && !choices.isSelectionEmpty()) {
-                filter.setText("");
-                ModList.loadCombined(modList.getCheckedMods(), choices.getSelectedValuesList(), model, info, modList);
-                modList.publishBoxChecked();
+
+        chooseProfiles.setToolTipText("选择本次启动使用的配置组");
+        chooseProfiles.addActionListener(event -> {
+            JPanel options = new JPanel();
+            options.setLayout(new BoxLayout(options, BoxLayout.Y_AXIS));
+            List<JCheckBox> boxes = new ArrayList<>();
+            ModList.getAllModListNames().stream().sorted().forEach(profile -> {
+                JCheckBox box = new JCheckBox(ModList.DEFAULT_LIST.equals(profile) ? "默认配置" : profile);
+                box.setActionCommand(profile);
+                box.setSelected(launchProfiles.isEmpty() ? profile.equals(activeProfile) : launchProfiles.contains(profile));
+                options.add(box);
+                boxes.add(box);
+            });
+            JScrollPane scroll = new JScrollPane(options);
+            scroll.setPreferredSize(new Dimension(ThemeManager.scale(250), ThemeManager.scale(180)));
+            JPanel dialog = new JPanel(new BorderLayout(0, ThemeManager.scale(6)));
+            dialog.add(new JLabel("未勾选时，只启动当前配置组。"), BorderLayout.NORTH);
+            dialog.add(scroll, BorderLayout.CENTER);
+            if (JOptionPane.showConfirmDialog(this, dialog, "同时启用配置组",
+                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) == JOptionPane.OK_OPTION) {
+                launchProfiles.clear();
+                for (JCheckBox box : boxes) {
+                    if (box.isSelected()) launchProfiles.add(box.getActionCommand());
+                }
+                updateProfileButton(chooseProfiles);
             }
         });
-        toolbar.add(mergeProfiles);
+        toolbar.add(chooseProfiles);
+        JButton coverCache = new JButton("封面缓存");
+        coverCache.addActionListener(event -> covers.showCacheDialog(this));
+        toolbar.add(coverCache);
 
         filterMods = () -> {
             String filterText = filter.getText().trim().toLowerCase();
@@ -557,6 +585,11 @@ public class ModSelectWindow extends JFrame
         return panel;
     }
 
+    private void updateProfileButton(JButton button)
+    {
+        button.setText(launchProfiles.isEmpty() ? "同时启用配置组" : "启用配置组 (" + launchProfiles.size() + ")");
+    }
+
     private JPanel makeInfoPanel()
     {
         JPanel panel = new JPanel();
@@ -625,18 +658,18 @@ public class ModSelectWindow extends JFrame
         JPanel descriptionPanel = new JPanel(new BorderLayout(0, ThemeManager.scale(4)));
         descriptionPanel.add(descScroller, BorderLayout.CENTER);
         descriptionPanel.add(editNote, BorderLayout.SOUTH);
-        descriptionPanel.setMinimumSize(new Dimension(ThemeManager.scale(120), 0));
+        descriptionPanel.setMinimumSize(new Dimension(ThemeManager.scale(120), ThemeManager.scale(95)));
 
         JScrollPane details = new JScrollPane(infoPanel);
         details.setBorder(null);
-        details.setMinimumSize(new Dimension(ThemeManager.scale(155), 0));
-        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, descriptionPanel, details);
+        details.setMinimumSize(new Dimension(ThemeManager.scale(155), ThemeManager.scale(100)));
+        JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, descriptionPanel, details);
         detailsSplit = split;
         split.setContinuousLayout(true);
-        split.setResizeWeight(0.85);
-        split.setDividerLocation(Math.max(ThemeManager.scale(170), location.width - ThemeManager.scale(530)));
+        split.setResizeWeight(0.35);
+        split.setDividerLocation(ThemeManager.scale(180));
         split.setBorder(null);
-        panel.setMinimumSize(new Dimension(ThemeManager.scale(290), 0));
+        panel.setMinimumSize(new Dimension(ThemeManager.scale(235), 0));
         if (modList.getModel().getSize() > 0) modList.setSelectedIndex(0);
         else description.setText("暂无模组。可从创意工坊订阅模组，或将模组放到本地模组目录。");
         panel.add(split, BorderLayout.CENTER);
@@ -961,16 +994,46 @@ public class ModSelectWindow extends JFrame
 
     void editModNote(ModInfo selected)
     {
+        JDialog dialog = new JDialog(this, "备注 · " + selected.Name, true);
+        dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+        JPanel content = new JPanel(new BorderLayout(0, ThemeManager.scale(10)));
+        int padding = ThemeManager.scale(14);
+        content.setBorder(new EmptyBorder(padding, padding, padding, padding));
+        content.setBackground(ThemeManager.BG_PRIMARY);
         JTextArea note = new JTextArea(ModList.getNote(selected), 6, 32);
+        note.setBackground(ThemeManager.BG_SECONDARY);
+        note.setForeground(ThemeManager.TEXT_PRIMARY);
+        note.setCaretColor(ThemeManager.TEXT_PRIMARY);
         note.setLineWrap(true);
         note.setWrapStyleWord(true);
         note.getAccessibleContext().setAccessibleName("模组备注");
-        if (JOptionPane.showConfirmDialog(this, new JScrollPane(note), "备注 · " + selected.Name,
-            JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
+        content.add(new JLabel("首行作为模组显示名称"), BorderLayout.NORTH);
+        content.add(new JScrollPane(note), BorderLayout.CENTER);
+        JButton cancel = new JButton("取消");
+        cancel.addActionListener(event -> dialog.dispose());
+        JButton save = new JButton("保存");
+        save.addActionListener(event -> {
             ModList.setNote(selected, note.getText());
+            dialog.dispose();
             setModInfo(selected);
             filterMods.run();
-        }
+        });
+        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, ThemeManager.scale(8), 0));
+        buttons.setOpaque(false);
+        buttons.add(cancel);
+        buttons.add(save);
+        content.add(buttons, BorderLayout.SOUTH);
+        dialog.setContentPane(content);
+        JRootPane root = dialog.getRootPane();
+        root.setDefaultButton(save);
+        root.registerKeyboardAction(event -> dialog.dispose(), KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0),
+            JComponent.WHEN_IN_FOCUSED_WINDOW);
+        root.registerKeyboardAction(event -> save.doClick(), KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, InputEvent.CTRL_DOWN_MASK),
+            JComponent.WHEN_IN_FOCUSED_WINDOW);
+        dialog.pack();
+        dialog.setLocationRelativeTo(this);
+        SwingUtilities.invokeLater(note::requestFocusInWindow);
+        dialog.setVisible(true);
     }
 
     private void updateNoteButton()
